@@ -1,7 +1,8 @@
 .container {
   width: 100%;
-  height: 100vh;
-  overflow-y: auto;
+  height: auto;
+  min-height: 100%;
+  overflow: visible; /* Let parent handle scrolling */
   overflow-x: hidden; /* Prevent horizontal scroll on mobile */
   background: #ffffff;
   padding: 2rem;

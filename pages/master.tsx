@@ -1205,7 +1205,19 @@ export default function MasterView() {
       </div>
 
       <div className={styles.mainContent}>
-        <div className={styles.content}>
+        <div 
+          className={styles.content}
+          ref={containerRef}
+          onScroll={(e) => {
+            const target = e.currentTarget;
+            const scrollTop = target.scrollTop;
+            const scrollHeight = target.scrollHeight;
+            const clientHeight = target.clientHeight;
+            const maxScroll = scrollHeight - clientHeight;
+            const scrollTopPercent = maxScroll > 0 ? (scrollTop / maxScroll) * 100 : 0;
+            handleScroll(scrollTop, scrollTopPercent, undefined);
+          }}
+        >
         {parsedDocument ? (
           <>
             {/* Transpose controls above song */}
@@ -1225,9 +1237,7 @@ export default function MasterView() {
             <ChordProRenderer
               key={`${currentSongId || 'default'}-transpose-${transpose}`}
               document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
-              onScroll={handleScroll}
-              onLineScroll={handleLineScroll}
-              isMaster={true}
+              isMaster={false}
               theme={theme}
               textSize={textSize}
             />
