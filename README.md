@@ -4,10 +4,17 @@ A web application for rendering ChordPro format text files with synchronized vie
 
 ## Features
 
-- **Master View**: Control the session and scroll position
+- **Master View**: Control the session, scroll position, and song selection
 - **Client View**: Viewers automatically sync with the master's scroll position
 - **Real-time Synchronization**: WebSocket-based synchronization for instant updates
-- **ChordPro Rendering**: Beautiful rendering of lyrics and chords
+- **Setlist Management**: Upload multiple songs, reorder with drag-and-drop, quick navigation
+- **Persistent Storage**: All files and setlists stored locally using IndexedDB and localStorage
+- **Custom Session IDs**: Create memorable session names (e.g., "blue-guitar")
+- **Dark/Light Mode**: Toggle between themes for different lighting conditions
+- **Text Size Controls**: Adjust text size while maintaining chord-lyric alignment
+- **Mobile Responsive**: Full functionality on mobile and tablet devices
+- **Line-based Scroll Sync**: Synchronized viewing works across different text zoom levels
+- **ChordPro Rendering**: Beautiful rendering of lyrics with chords positioned above
 
 ## Getting Started
 
