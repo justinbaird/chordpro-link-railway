@@ -67,7 +67,19 @@ export default function ChordProRenderer({
       console.log('Scroll sync effect triggered:', { scrollTopPercent, scrollPosition, targetLineIndex, isMaster });
       console.log('Container element:', containerRef.current);
       console.log('Container data-master attribute:', containerRef.current?.getAttribute('data-master'));
-      console.log('Container computed styles:', containerRef.current ? window.getComputedStyle(containerRef.current) : null);
+      const computedStyle = containerRef.current ? window.getComputedStyle(containerRef.current) : null;
+      console.log('Container computed styles:', {
+        height: computedStyle?.height,
+        maxHeight: computedStyle?.maxHeight,
+        minHeight: computedStyle?.minHeight,
+        overflow: computedStyle?.overflow,
+        overflowY: computedStyle?.overflowY,
+        display: computedStyle?.display,
+        flex: computedStyle?.flex,
+        flexGrow: computedStyle?.flexGrow,
+        flexShrink: computedStyle?.flexShrink,
+        flexBasis: computedStyle?.flexBasis,
+      });
       console.log('Container dimensions:', {
         scrollHeight: containerRef.current.scrollHeight,
         clientHeight: containerRef.current.clientHeight,
@@ -78,14 +90,32 @@ export default function ChordProRenderer({
       // Check parent dimensions
       if (containerRef.current?.parentElement) {
         const parent = containerRef.current.parentElement;
-        console.log('Parent element:', parent);
+        const parentComputed = window.getComputedStyle(parent);
+        console.log('Parent element:', parent, parent.className);
         console.log('Parent dimensions:', {
           scrollHeight: parent.scrollHeight,
           clientHeight: parent.clientHeight,
           offsetHeight: parent.offsetHeight,
-          computedHeight: window.getComputedStyle(parent).height,
-          computedOverflow: window.getComputedStyle(parent).overflow,
+          computedHeight: parentComputed.height,
+          computedMaxHeight: parentComputed.maxHeight,
+          computedMinHeight: parentComputed.minHeight,
+          computedOverflow: parentComputed.overflow,
+          computedDisplay: parentComputed.display,
+          computedFlex: parentComputed.flex,
         });
+        // Check grandparent if it exists
+        if (parent.parentElement) {
+          const grandparent = parent.parentElement;
+          const grandparentComputed = window.getComputedStyle(grandparent);
+          console.log('Grandparent element:', grandparent, grandparent.className);
+          console.log('Grandparent dimensions:', {
+            scrollHeight: grandparent.scrollHeight,
+            clientHeight: grandparent.clientHeight,
+            offsetHeight: grandparent.offsetHeight,
+            computedHeight: grandparentComputed.height,
+            computedDisplay: grandparentComputed.display,
+          });
+        }
       }
       
       // Use requestAnimationFrame to ensure DOM is ready

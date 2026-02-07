@@ -27,6 +27,8 @@
   overflow-y: auto !important;
   overflow-x: hidden !important;
   position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* Mobile optimization: prevent horizontal scroll */
@@ -49,9 +51,10 @@
   padding-bottom: 50vh; /* Allow scrolling past content */
 }
 
-/* On client, don't force min-height on content */
+/* On client, don't force min-height on content - let it be natural height */
 .container[data-master="false"] .content {
   min-height: auto;
+  flex-shrink: 0; /* Don't shrink content, let container scroll */
 }
 
 .bottomSpacer {
