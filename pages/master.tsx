@@ -252,9 +252,13 @@ export default function MasterView() {
     setTranspose(newTranspose);
     if (sessionId && currentSongId) {
       setStoredTranspose(sessionId, currentSongId, newTranspose);
-      // Sync transpose to clients with song ID
-      if (socketClient && sessionId) {
-        socketClient.updateContent({ transpose: newTranspose });
+      // Sync transpose to clients with document refresh to force re-render
+      if (socketClient && sessionId && document) {
+        socketClient.updateContent({ 
+          document: document,
+          transpose: newTranspose,
+          currentSongTitle: currentSongTitle,
+        });
       }
     }
   };
@@ -265,9 +269,13 @@ export default function MasterView() {
     setTranspose(newTranspose);
     if (sessionId && currentSongId) {
       setStoredTranspose(sessionId, currentSongId, newTranspose);
-      // Sync transpose to clients with song ID
-      if (socketClient && sessionId) {
-        socketClient.updateContent({ transpose: newTranspose });
+      // Sync transpose to clients with document refresh to force re-render
+      if (socketClient && sessionId && document) {
+        socketClient.updateContent({ 
+          document: document,
+          transpose: newTranspose,
+          currentSongTitle: currentSongTitle,
+        });
       }
     }
   };
@@ -277,9 +285,13 @@ export default function MasterView() {
     setTranspose(0);
     if (sessionId && currentSongId) {
       setStoredTranspose(sessionId, currentSongId, 0);
-      // Sync transpose to clients with song ID
-      if (socketClient && sessionId) {
-        socketClient.updateContent({ transpose: 0 });
+      // Sync transpose to clients with document refresh to force re-render
+      if (socketClient && sessionId && document) {
+        socketClient.updateContent({ 
+          document: document,
+          transpose: 0,
+          currentSongTitle: currentSongTitle,
+        });
       }
     }
   };
@@ -289,9 +301,13 @@ export default function MasterView() {
     setTranspose(semitones);
     if (sessionId && currentSongId) {
       setStoredTranspose(sessionId, currentSongId, semitones);
-      // Sync transpose to clients with song ID
-      if (socketClient && sessionId) {
-        socketClient.updateContent({ transpose: semitones });
+      // Sync transpose to clients with document refresh to force re-render
+      if (socketClient && sessionId && document) {
+        socketClient.updateContent({ 
+          document: document,
+          transpose: semitones,
+          currentSongTitle: currentSongTitle,
+        });
       }
     }
   };
