@@ -30,11 +30,14 @@ export default function ChordProRenderer({
   const previousDocumentRef = React.useRef<ChordProDocument | null>(null);
   const lineRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
 
-  // Scroll to top only when document changes (new file loaded)
-  // Don't scroll if scrollPosition is provided (preserving scroll during transpose)
+  // Scroll to top only when document content actually changes (not just transpose)
+  // Compare by checking if the number of lines changed or if it's a completely different document
   React.useEffect(() => {
-    // Check if document actually changed
-    if (previousDocumentRef.current !== document) {
+    const documentChanged = previousDocumentRef.current === null || 
+      previousDocumentRef.current.lines.length !== document.lines.length ||
+      (previousDocumentRef.current.title !== document.title);
+    
+    if (documentChanged) {
       previousDocumentRef.current = document;
       
       // Clear line refs when document changes
@@ -51,16 +54,22 @@ export default function ChordProRenderer({
           onLineScroll(0);
         }
       }
+    } else {
+      // Document didn't actually change (just transpose), update ref but don't scroll
+      previousDocumentRef.current = document;
     }
   }, [document, isMaster, onScroll, onLineScroll, scrollPosition]);
 
   // Sync scroll position when it changes (for clients) - use percentage-based sync when available
   React.useEffect(() => {
     if (!isMaster && containerRef.current) {
-      // Restore scroll position if provided (for transpose updates that cause remount)
+      console.log('Scroll sync effect triggered:', { scrollTopPercent, scrollPosition, targetLineIndex });
       // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
-        if (!containerRef.current) return;
+      const applyScroll = () => {
+        if (!containerRef.current) {
+          console.log('Container ref not available');
+          return;
+        }
         
         // Use percentage-based sync if available (best for different screen sizes)
         if (scrollTopPercent !== undefined) {
@@ -68,7 +77,9 @@ export default function ChordProRenderer({
           const clientHeight = containerRef.current.clientHeight;
           const maxScroll = scrollHeight - clientHeight;
           if (maxScroll > 0) {
-            containerRef.current.scrollTop = (scrollTopPercent / 100) * maxScroll;
+            const targetScroll = (scrollTopPercent / 100) * maxScroll;
+            console.log('Applying scroll via percentage:', { scrollTopPercent, targetScroll, scrollHeight, clientHeight, maxScroll });
+            containerRef.current.scrollTop = targetScroll;
             return;
           }
         }
@@ -77,6 +88,7 @@ export default function ChordProRenderer({
         if (targetLineIndex !== undefined && lineRefs.current.has(targetLineIndex)) {
           const targetLineElement = lineRefs.current.get(targetLineIndex);
           if (targetLineElement) {
+            console.log('Applying scroll via line index:', { targetLineIndex, offsetTop: targetLineElement.offsetTop });
             // Scroll the target line to the top
             containerRef.current.scrollTop = targetLineElement.offsetTop;
             return;
@@ -85,8 +97,18 @@ export default function ChordProRenderer({
         
         // Fallback to pixel-based sync (also used for transpose preservation)
         if (scrollPosition !== undefined && scrollPosition > 0) {
+          console.log('Applying scroll via position:', scrollPosition);
           containerRef.current.scrollTop = scrollPosition;
         }
+      };
+      
+      // Try immediately, then retry after a short delay to ensure DOM is ready
+      requestAnimationFrame(() => {
+        applyScroll();
+        // Retry after a short delay in case content is still rendering
+        setTimeout(applyScroll, 50);
+        // Also retry after longer delay for slow renders
+        setTimeout(applyScroll, 200);
       });
     }
   }, [scrollTopPercent, targetLineIndex, scrollPosition, isMaster, document]);
@@ -282,7 +304,7 @@ export default function ChordProRenderer({
     <div
       ref={containerRef}
       className={`${styles.container} ${theme === 'dark' ? styles.dark : ''}`}
-      onScroll={handleScroll}
+      onScroll={isMaster ? undefined : handleScroll}
       style={textSizeStyle}
     >
       <div className={styles.content}>

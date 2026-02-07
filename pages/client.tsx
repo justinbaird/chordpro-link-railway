@@ -128,6 +128,7 @@ export default function ClientView() {
 
     // Listen for new sync-scroll event (primary method)
     client.onScrollSynced((data) => {
+      console.log('Scroll sync received:', data);
       if (data.scrollTopPercent !== undefined) {
         setScrollTopPercent(data.scrollTopPercent);
       }
