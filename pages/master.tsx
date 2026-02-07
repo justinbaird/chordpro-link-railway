@@ -284,17 +284,41 @@ export default function MasterView() {
       setIsLoading(false);
       setCustomSessionIdInput('');
       // Load setlist if it exists for this session
-      const storedSetlist = getStoredSetlist(finalSessionId);
-      if (storedSetlist && storedSetlist.length > 0) {
-        setSetlist(storedSetlist);
-        // Restore current song if available
-        const storedCurrentSongId = getStoredCurrentSongId(finalSessionId);
-        if (storedCurrentSongId) {
-          const songToRestore = storedSetlist.find(item => item.id === storedCurrentSongId);
-          if (songToRestore) {
-            selectSong(songToRestore, storedSetlist);
+      const storedSetlistMetadata = getStoredSetlist(finalSessionId);
+      if (storedSetlistMetadata && storedSetlistMetadata.length > 0) {
+        // Load file contents from IndexedDB
+        Promise.all(
+          storedSetlistMetadata.map(async (metadata) => {
+            const fileRecord = await getFile(metadata.id);
+            if (fileRecord) {
+              return {
+                ...metadata,
+                content: fileRecord.content,
+              };
+            }
+            // Fallback: if file not found in IndexedDB, return metadata only
+            return {
+              ...metadata,
+              content: '',
+            };
+          })
+        ).then((loadedSetlist) => {
+          // Filter out items without content (failed to load)
+          const validSetlist = loadedSetlist.filter(item => item.content);
+          if (validSetlist.length > 0) {
+            setSetlist(validSetlist);
+            // Restore current song if available
+            const storedCurrentSongId = getStoredCurrentSongId(finalSessionId);
+            if (storedCurrentSongId) {
+              const songToRestore = validSetlist.find(item => item.id === storedCurrentSongId);
+              if (songToRestore) {
+                selectSong(songToRestore, validSetlist);
+              }
+            }
           }
-        }
+        }).catch((error) => {
+          console.error('Error loading files from IndexedDB:', error);
+        });
       }
     }).catch((error) => {
       console.error('Failed to create custom session:', error);
