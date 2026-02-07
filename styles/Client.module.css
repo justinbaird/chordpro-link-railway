@@ -309,11 +309,12 @@
 }
 
 .content {
-  flex: 1;
+  flex: 1 1 0; /* Grow and shrink, base size 0 */
   overflow: hidden;
   display: flex;
   flex-direction: column;
   min-height: 0; /* Important: allows flex child to shrink below content size */
+  height: 0; /* Force flex to constrain height */
 }
 
 .emptyState {
