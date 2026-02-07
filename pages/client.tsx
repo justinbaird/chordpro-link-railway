@@ -25,6 +25,7 @@ export default function ClientView() {
   const [parsedDocument, setParsedDocument] = useState<any>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [scrollTopPercent, setScrollTopPercent] = useState<number | undefined>(undefined);
   const [targetLineIndex, setTargetLineIndex] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [theme, setTheme] = useTheme();
@@ -79,6 +80,10 @@ export default function ClientView() {
           setScrollPosition(sessionInfo.scrollPosition);
         }
         
+        if (sessionInfo.scrollTopPercent !== undefined) {
+          setScrollTopPercent(sessionInfo.scrollTopPercent);
+        }
+        
         if (sessionInfo.lineIndex !== undefined) {
           setTargetLineIndex(sessionInfo.lineIndex);
         }
@@ -119,6 +124,19 @@ export default function ClientView() {
     // Listen for scroll updates (pixel-based, for backward compatibility)
     client.onScrollUpdate((position) => {
       setScrollPosition(position);
+    });
+
+    // Listen for new sync-scroll event (primary method)
+    client.onScrollSynced((data) => {
+      if (data.scrollTopPercent !== undefined) {
+        setScrollTopPercent(data.scrollTopPercent);
+      }
+      if (data.scrollPosition !== undefined) {
+        setScrollPosition(data.scrollPosition);
+      }
+      if (data.lineIndex !== undefined) {
+        setTargetLineIndex(data.lineIndex);
+      }
     });
 
     // Listen for line-based scroll updates
@@ -319,6 +337,7 @@ export default function ClientView() {
             key={`${currentSongTitle || 'default'}-transpose-${transpose}`}
             document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
             scrollPosition={preservedScrollRef.current !== null ? preservedScrollRef.current : scrollPosition}
+            scrollTopPercent={scrollTopPercent}
             targetLineIndex={targetLineIndex}
             isMaster={false}
             theme={theme}

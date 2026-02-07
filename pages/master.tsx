@@ -1215,7 +1215,26 @@ export default function MasterView() {
             const clientHeight = target.clientHeight;
             const maxScroll = scrollHeight - clientHeight;
             const scrollTopPercent = maxScroll > 0 ? (scrollTop / maxScroll) * 100 : 0;
-            handleScroll(scrollTop, scrollTopPercent, undefined);
+            
+            // Calculate line index for better sync
+            let lineIndex: number | undefined = undefined;
+            if (parsedDocument) {
+              // Find the line closest to scroll position
+              const allLines = target.querySelectorAll('[data-line-index]');
+              let minDistance = Infinity;
+              allLines.forEach((lineEl) => {
+                const element = lineEl as HTMLElement;
+                const lineIdx = parseInt(element.dataset.lineIndex || '0', 10);
+                const elementTop = element.offsetTop;
+                const distance = Math.abs(scrollTop - elementTop);
+                if (distance < minDistance) {
+                  minDistance = distance;
+                  lineIndex = lineIdx;
+                }
+              });
+            }
+            
+            handleScroll(scrollTop, scrollTopPercent, lineIndex);
           }}
         >
         {parsedDocument ? (

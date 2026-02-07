@@ -142,14 +142,15 @@ export default function ChordProRenderer({
 
   const renderLine = (line: ChordProLine, index: number) => {
     const lineRef = (el: HTMLDivElement | null) => setLineRef(index, el);
+    const lineProps = { 'data-line-index': index.toString() };
     
     switch (line.type) {
       case 'empty':
-        return <div key={index} ref={lineRef} className={styles.emptyLine} />;
+        return <div key={index} ref={lineRef} {...lineProps} className={styles.emptyLine} />;
 
       case 'comment':
         return (
-          <div key={index} ref={setLineRef.bind(null, index)} className={styles.comment}>
+          <div key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.comment}>
             #{line.content}
           </div>
         );
@@ -157,41 +158,41 @@ export default function ChordProRenderer({
       case 'directive':
         if (line.directive === 'title' && line.value) {
           return (
-            <h1 key={index} ref={setLineRef.bind(null, index)} className={styles.title}>
+            <h1 key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.title}>
               {line.value}
             </h1>
           );
         }
         if (line.directive === 'subtitle' && line.value) {
           return (
-            <h2 key={index} ref={setLineRef.bind(null, index)} className={styles.subtitle}>
+            <h2 key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.subtitle}>
               {line.value}
             </h2>
           );
         }
         if (line.directive === 'start_of_chorus') {
           return (
-            <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionMarker}>
+            <div key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.sectionMarker}>
               <span className={styles.sectionLabel}>Chorus</span>
             </div>
           );
         }
         if (line.directive === 'end_of_chorus') {
-          return <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionEnd} />;
+          return <div key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.sectionEnd} />;
         }
         if (line.directive === 'start_of_verse') {
           return (
-            <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionMarker}>
+            <div key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.sectionMarker}>
               <span className={styles.sectionLabel}>Verse</span>
             </div>
           );
         }
         if (line.directive === 'end_of_verse') {
-          return <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionEnd} />;
+          return <div key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.sectionEnd} />;
         }
         if (line.directive === 'comment' && line.value) {
           return (
-            <div key={index} ref={setLineRef.bind(null, index)} className={styles.commentDirective}>
+            <div key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.commentDirective}>
               <div className={styles.commentLine} />
               <div className={styles.commentText}>{line.value}</div>
               <div className={styles.commentLine} />
@@ -202,7 +203,7 @@ export default function ChordProRenderer({
 
       case 'lyrics':
         return (
-          <div key={index} ref={setLineRef.bind(null, index)} className={styles.lyricsLine}>
+          <div key={index} ref={setLineRef.bind(null, index)} {...lineProps} className={styles.lyricsLine}>
             {renderLyricsWithChords(line.lyrics || '', line.chords || [])}
           </div>
         );
