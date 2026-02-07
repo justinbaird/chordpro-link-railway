@@ -142,12 +142,15 @@ export default function ClientView() {
     // Listen for content updates (including transpose)
     client.onContentUpdate((data) => {
       if (data.transpose !== undefined) {
+        // Transpose is per-song, so update it when content changes
         setTranspose(data.transpose);
       }
       if (data.document !== undefined) {
         setDocument(data.document);
         const parsed = parseChordPro(data.document);
         setParsedDocument(parsed);
+        // Reset transpose when document changes (new song loaded)
+        // The transpose will be synced via the transpose field in the update
       }
       if (data.currentSongTitle !== undefined) {
         setCurrentSongTitle(data.currentSongTitle);

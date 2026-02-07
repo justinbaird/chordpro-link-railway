@@ -112,11 +112,6 @@ export default function MasterView() {
       setSocketClient(client);
       setSessionIdEditValue(finalSessionId); // Initialize edit value
       
-      // Load transpose preference for this session
-      // Check if document has transpose directive first, otherwise use stored preference
-      const storedTranspose = getStoredTranspose(finalSessionId);
-      setTranspose(storedTranspose);
-      
       // Load setlist metadata for this session
       const storedSetlistMetadata = getStoredSetlist(finalSessionId);
       if (storedSetlistMetadata && storedSetlistMetadata.length > 0) {
@@ -252,11 +247,12 @@ export default function MasterView() {
   };
 
   const handleTransposeIncrease = () => {
+    if (!currentSongId) return;
     const newTranspose = Math.min(11, transpose + 1);
     setTranspose(newTranspose);
-    if (sessionId) {
-      setStoredTranspose(sessionId, newTranspose);
-      // Sync transpose to clients
+    if (sessionId && currentSongId) {
+      setStoredTranspose(sessionId, currentSongId, newTranspose);
+      // Sync transpose to clients with song ID
       if (socketClient && sessionId) {
         socketClient.updateContent({ transpose: newTranspose });
       }
@@ -264,11 +260,12 @@ export default function MasterView() {
   };
 
   const handleTransposeDecrease = () => {
+    if (!currentSongId) return;
     const newTranspose = Math.max(-11, transpose - 1);
     setTranspose(newTranspose);
-    if (sessionId) {
-      setStoredTranspose(sessionId, newTranspose);
-      // Sync transpose to clients
+    if (sessionId && currentSongId) {
+      setStoredTranspose(sessionId, currentSongId, newTranspose);
+      // Sync transpose to clients with song ID
       if (socketClient && sessionId) {
         socketClient.updateContent({ transpose: newTranspose });
       }
@@ -276,10 +273,11 @@ export default function MasterView() {
   };
 
   const handleTransposeReset = () => {
+    if (!currentSongId) return;
     setTranspose(0);
-    if (sessionId) {
-      setStoredTranspose(sessionId, 0);
-      // Sync transpose to clients
+    if (sessionId && currentSongId) {
+      setStoredTranspose(sessionId, currentSongId, 0);
+      // Sync transpose to clients with song ID
       if (socketClient && sessionId) {
         socketClient.updateContent({ transpose: 0 });
       }
@@ -287,10 +285,11 @@ export default function MasterView() {
   };
 
   const handleTransposeSetValue = (semitones: number) => {
+    if (!currentSongId) return;
     setTranspose(semitones);
-    if (sessionId) {
-      setStoredTranspose(sessionId, semitones);
-      // Sync transpose to clients
+    if (sessionId && currentSongId) {
+      setStoredTranspose(sessionId, currentSongId, semitones);
+      // Sync transpose to clients with song ID
       if (socketClient && sessionId) {
         socketClient.updateContent({ transpose: semitones });
       }
@@ -440,17 +439,19 @@ export default function MasterView() {
     const parsed = parseChordPro(item.content);
     setParsedDocument(parsed);
     
-    // Apply transpose from file directive if present, otherwise keep current transpose
-    if (parsed.transpose !== undefined) {
-      setTranspose(parsed.transpose);
-      if (sessionId) {
-        setStoredTranspose(sessionId, parsed.transpose);
-        // Sync transpose to clients
-        if (socketClient && sessionId) {
-          socketClient.updateContent({ transpose: parsed.transpose });
-        }
+    // Load transpose for this specific song
+    let songTranspose = 0;
+    if (sessionId) {
+      // Check if file has transpose directive first
+      if (parsed.transpose !== undefined) {
+        songTranspose = parsed.transpose;
+        setStoredTranspose(sessionId, item.id, songTranspose);
+      } else {
+        // Otherwise load stored transpose for this song
+        songTranspose = getStoredTranspose(sessionId, item.id);
       }
     }
+    setTranspose(songTranspose);
     // Use parsed title if available, otherwise use item title
     const displayTitle = parsed.title || item.title;
     setCurrentSongTitle(displayTitle);
@@ -471,11 +472,12 @@ export default function MasterView() {
         currentSongTitle: displayTitle,
         upNextTitle: nextItem ? nextItem.title : '',
         previousSongTitle: previousItem ? previousItem.title : '',
+        transpose: songTranspose, // Use the transpose loaded for this song
       });
       // Scroll to top when new song is loaded
       socketClient.updateScroll(0);
     }
-  }, [setlist, socketClient]);
+  }, [setlist, socketClient, sessionId]);
 
   // Update ref whenever selectSong changes
   useEffect(() => {
@@ -1014,18 +1016,6 @@ export default function MasterView() {
               </div>
               <div className={styles.menuDivider} />
               <div className={styles.menuItem}>
-                <span className={styles.menuLabel}>Key Change:</span>
-                <TransposeControls
-                  transpose={transpose}
-                  onIncrease={handleTransposeIncrease}
-                  onDecrease={handleTransposeDecrease}
-                  onReset={handleTransposeReset}
-                  onSetValue={handleTransposeSetValue}
-                  theme={theme}
-                />
-              </div>
-              <div className={styles.menuDivider} />
-              <div className={styles.menuItem}>
                 <ThemeToggle
                   theme={theme}
                   onToggle={() => setTheme(theme === 'light' ? 'dark' : 'light')}
@@ -1143,15 +1133,30 @@ export default function MasterView() {
       <div className={styles.mainContent}>
         <div className={styles.content}>
         {parsedDocument ? (
-          <ChordProRenderer
-            key={currentSongId || 'default'}
-            document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
-            onScroll={handleScroll}
-            onLineScroll={handleLineScroll}
-            isMaster={true}
-            theme={theme}
-            textSize={textSize}
-          />
+          <>
+            {/* Transpose controls above song */}
+            {currentSongId && (
+              <div className={styles.transposeSection}>
+                <TransposeControls
+                  transpose={transpose}
+                  onIncrease={handleTransposeIncrease}
+                  onDecrease={handleTransposeDecrease}
+                  onReset={handleTransposeReset}
+                  onSetValue={handleTransposeSetValue}
+                  theme={theme}
+                />
+              </div>
+            )}
+            <ChordProRenderer
+              key={currentSongId || 'default'}
+              document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
+              onScroll={handleScroll}
+              onLineScroll={handleLineScroll}
+              isMaster={true}
+              theme={theme}
+              textSize={textSize}
+            />
+          </>
         ) : (
           <div className={styles.emptyState}>
             <p>Upload a ChordPro file to get started</p>

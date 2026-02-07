@@ -581,6 +581,21 @@
   flex-direction: column;
 }
 
+.transposeSection {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.container.dark .transposeSection {
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom-color: #404040;
+}
+
 .emptyState {
   display: flex;
   flex-direction: column;
