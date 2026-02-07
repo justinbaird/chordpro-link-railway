@@ -192,10 +192,6 @@ export class SocketClient {
     return this.createRoom(customSessionId);
   }
 
-  joinSession(roomId: string): Promise<SessionInfo> {
-    return this.joinSession(roomId);
-  }
-
   updateDocument(document: string): void {
     if (!this.socket || !this.sessionId || !this.isMaster) {
       return;

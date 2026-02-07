@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { SocketClient } from '@/lib/socket-client';
@@ -45,8 +45,11 @@ export default function MasterView() {
   const [dragOverSetlistIndex, setDragOverSetlistIndex] = useState<number | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'syncing'>('disconnected');
   const [masterSessionId, setMasterSessionId] = useState<string | null>(null);
+  const selectSongRef = useRef<((item: SetlistItem, setlistOverride?: SetlistItem[]) => void) | null>(null);
 
   useEffect(() => {
+    if (!router.isReady) return;
+    
     setIsLoading(true);
     const client = new SocketClient();
     
@@ -134,10 +137,10 @@ export default function MasterView() {
             const storedCurrentSongId = getStoredCurrentSongId(finalSessionId);
             if (storedCurrentSongId) {
               const songToRestore = validSetlist.find(item => item.id === storedCurrentSongId);
-              if (songToRestore) {
+              if (songToRestore && selectSongRef.current) {
                 // Use setTimeout to ensure state is updated
                 setTimeout(() => {
-                  selectSong(songToRestore, validSetlist);
+                  selectSongRef.current?.(songToRestore, validSetlist);
                 }, 100);
               }
             }
@@ -158,7 +161,8 @@ export default function MasterView() {
     return () => {
       client.disconnect();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
 
   // Save setlist whenever it changes
   useEffect(() => {
@@ -350,7 +354,7 @@ export default function MasterView() {
     }
   };
 
-  const selectSong = (item: SetlistItem, setlistOverride?: SetlistItem[]) => {
+  const selectSong = useCallback((item: SetlistItem, setlistOverride?: SetlistItem[]) => {
     const listToUse = setlistOverride || setlist;
     setCurrentSongId(item.id);
     setDocument(item.content);
@@ -380,7 +384,12 @@ export default function MasterView() {
       // Scroll to top when new song is loaded
       socketClient.updateScroll(0);
     }
-  };
+  }, [setlist, socketClient]);
+
+  // Update ref whenever selectSong changes
+  useEffect(() => {
+    selectSongRef.current = selectSong;
+  }, [selectSong]);
 
   const handleSetlistReorder = (newItems: SetlistItem[]) => {
     setSetlist(newItems);
