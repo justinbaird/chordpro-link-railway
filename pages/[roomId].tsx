@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { SocketClient } from '@/lib/socket-client';
@@ -8,6 +8,8 @@ import ThemeToggle from '@/components/ThemeToggle';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import TextSizeControls from '@/components/TextSizeControls';
 import { getStoredTextSize, setStoredTextSize } from '@/lib/textSizeStorage';
+import { requestWakeLock, releaseWakeLock } from '@/lib/wakeLock';
+import ConnectionStatus from '@/components/ConnectionStatus';
 import styles from '../styles/Client.module.css';
 
 const ChordProRenderer = dynamic(
@@ -15,11 +17,11 @@ const ChordProRenderer = dynamic(
   { ssr: false }
 );
 
-export default function ClientView() {
+export default function RoomView() {
   const router = useRouter();
-  const { session: sessionIdParam } = router.query;
+  const { roomId } = router.query;
   const [socketClient, setSocketClient] = useState<SocketClient | null>(null);
-  const [sessionId, setSessionId] = useState<string>('');
+  const [currentRoomId, setCurrentRoomId] = useState<string>('');
   const [document, setDocument] = useState<string>('');
   const [parsedDocument, setParsedDocument] = useState<any>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -31,48 +33,63 @@ export default function ClientView() {
   const [upNextTitle, setUpNextTitle] = useState<string>('');
   const [previousSongTitle, setPreviousSongTitle] = useState<string>('');
   const [textSize, setTextSize] = useState<number>(getStoredTextSize());
+  const [isMaster, setIsMaster] = useState(false);
+  const [wakeLockActive, setWakeLockActive] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'syncing'>('disconnected');
+  const [scrollTopPercent, setScrollTopPercent] = useState<number | undefined>(undefined);
 
   useEffect(() => {
-    if (!sessionIdParam || typeof sessionIdParam !== 'string') {
+    if (!roomId || typeof roomId !== 'string') {
       return;
     }
 
+    // Request wake lock for mobile devices
+    requestWakeLock().then((success) => {
+      setWakeLockActive(success);
+    });
+
     const client = new SocketClient();
+    
+    // Listen for connection status changes
+    client.onConnectionStatusChange((status) => {
+      setConnectionStatus(status);
+      setIsConnected(status === 'connected');
+    });
     
     client.connect().then(() => {
       setIsConnected(true);
-      // Normalize room ID (uppercase)
-      const normalizedRoomId = sessionIdParam.toUpperCase().trim();
-      client.joinRoom(normalizedRoomId).then((sessionInfo) => {
-        console.log('Joined session, received info:', {
-          sessionId: sessionInfo.sessionId,
+      setConnectionStatus('connected');
+      const normalizedRoomId = roomId.toUpperCase().trim();
+      
+      client.joinSession(normalizedRoomId).then((sessionInfo) => {
+        console.log('Joined room, received info:', {
+          roomId: sessionInfo.sessionId,
           isMaster: sessionInfo.isMaster,
           hasDocument: !!sessionInfo.document,
-          documentLength: sessionInfo.document ? sessionInfo.document.length : 0,
-          scrollPosition: sessionInfo.scrollPosition,
         });
-        setSessionId(sessionInfo.sessionId);
+        
+        setCurrentRoomId(sessionInfo.sessionId);
+        setIsMaster(sessionInfo.isMaster);
         setSocketClient(client);
         
         // Check if document exists and is not empty
         if (sessionInfo.document && typeof sessionInfo.document === 'string' && sessionInfo.document.trim().length > 0) {
-          console.log('Document received on join, length:', sessionInfo.document.length);
-          console.log('Document preview:', sessionInfo.document.substring(0, 200));
           setDocument(sessionInfo.document);
           try {
             const parsed = parseChordPro(sessionInfo.document);
             setParsedDocument(parsed);
-            console.log('Document parsed successfully, lines:', parsed.lines.length);
           } catch (parseError) {
             console.error('Error parsing document:', parseError);
             setError('Failed to parse document');
           }
-        } else {
-          console.log('No document in session yet (document:', sessionInfo.document, ')');
         }
         
         if (sessionInfo.scrollPosition !== undefined) {
           setScrollPosition(sessionInfo.scrollPosition);
+        }
+        
+        if (sessionInfo.scrollTopPercent !== undefined) {
+          setScrollTopPercent(sessionInfo.scrollTopPercent);
         }
         
         if (sessionInfo.lineIndex !== undefined) {
@@ -91,8 +108,8 @@ export default function ClientView() {
           setPreviousSongTitle(sessionInfo.previousSongTitle);
         }
       }).catch((err) => {
-        console.error('Failed to join session:', err);
-        setError(err.message || 'Failed to join session');
+        console.error('Failed to join room:', err);
+        setError(err.message || 'Failed to join room');
       });
     }).catch((error) => {
       console.error('Failed to connect:', error);
@@ -101,14 +118,47 @@ export default function ClientView() {
 
     // Listen for document updates
     client.onDocumentUpdate((updatedDocument) => {
-      console.log('Document update received:', updatedDocument.substring(0, 100));
       setDocument(updatedDocument);
       const parsed = parseChordPro(updatedDocument);
       setParsedDocument(parsed);
-      // Scroll position will be reset by the renderer when document changes
     });
 
-    // Listen for scroll updates (pixel-based, for backward compatibility)
+    // Listen for content updates (new unified event)
+    client.onContentUpdate((data) => {
+      if (data.document !== undefined) {
+        setDocument(data.document);
+        try {
+          const parsed = parseChordPro(data.document);
+          setParsedDocument(parsed);
+        } catch (parseError) {
+          console.error('Error parsing document:', parseError);
+        }
+      }
+      if (data.currentSongTitle !== undefined) {
+        setCurrentSongTitle(data.currentSongTitle);
+      }
+      if (data.upNextTitle !== undefined) {
+        setUpNextTitle(data.upNextTitle);
+      }
+      if (data.previousSongTitle !== undefined) {
+        setPreviousSongTitle(data.previousSongTitle);
+      }
+    });
+
+    // Listen for scroll updates (new sync-scroll event - primary method)
+    client.onScrollSynced((data) => {
+      if (data.scrollTopPercent !== undefined) {
+        setScrollTopPercent(data.scrollTopPercent);
+      }
+      if (data.scrollPosition !== undefined) {
+        setScrollPosition(data.scrollPosition);
+      }
+      if (data.lineIndex !== undefined) {
+        setTargetLineIndex(data.lineIndex);
+      }
+    });
+
+    // Listen for scroll updates (legacy)
     client.onScrollUpdate((position) => {
       setScrollPosition(position);
     });
@@ -133,15 +183,17 @@ export default function ClientView() {
       setPreviousSongTitle(previous);
     });
 
-    // Listen for session closure
+    // Listen for room closure
     client.onSessionClosed(() => {
-      setError('Session closed by master');
+      setError('Room closed by master');
     });
 
+    // Cleanup
     return () => {
+      releaseWakeLock();
       client.disconnect();
     };
-  }, [sessionIdParam]);
+  }, [roomId]);
 
   const handleTextSizeIncrease = () => {
     const newSize = Math.min(2.0, textSize + 0.1);
@@ -160,6 +212,39 @@ export default function ClientView() {
     setStoredTextSize(1.0);
   };
 
+  const handleShareRoom = async () => {
+    const url = `${window.location.origin}/${currentRoomId}`;
+    
+    if (navigator.share) {
+      // Use native share sheet on mobile
+      try {
+        await navigator.share({
+          title: 'Join ChordPro Session',
+          text: `Join my ChordPro session: ${currentRoomId}`,
+          url: url,
+        });
+      } catch (err) {
+        // User cancelled or error - fallback to clipboard
+        navigator.clipboard.writeText(url);
+        alert(`Room URL copied to clipboard: ${url}`);
+      }
+    } else {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(url);
+      alert(`Room URL copied to clipboard: ${url}`);
+    }
+  };
+
+  const handleToggleMode = () => {
+    if (isMaster) {
+      // Switch to client mode - just reload as client
+      router.push(`/${currentRoomId}`);
+    } else {
+      // Switch to master mode
+      router.push(`/master?room=${currentRoomId}`);
+    }
+  };
+
   if (error) {
     return (
       <div className={`${styles.container} ${theme === 'dark' ? styles.dark : ''}`}>
@@ -176,6 +261,7 @@ export default function ClientView() {
 
   return (
     <div className={`${styles.container} ${theme === 'dark' ? styles.dark : ''}`}>
+      <ConnectionStatus status={connectionStatus} theme={theme} />
       <div className={styles.header}>
         <div className={styles.headerContent}>
           <div className={styles.headerLeft}>
@@ -206,26 +292,35 @@ export default function ClientView() {
           <div className={styles.headerActions}>
             <HamburgerMenu theme={theme}>
               <h2 className={styles.menuTitle}>Menu</h2>
-              {sessionId && (
+              {currentRoomId && (
                 <div className={styles.menuItem}>
-                  <span className={styles.menuLabel}>Session ID:</span>
-                  <span className={styles.sessionId}>{sessionId}</span>
+                  <span className={styles.menuLabel}>Room ID:</span>
+                  <div className={styles.menuSessionId}>
+                    <span className={styles.sessionId}>{currentRoomId}</span>
+                    <button onClick={handleShareRoom} className={styles.copyButton}>
+                      Share
+                    </button>
+                  </div>
                 </div>
               )}
+              <div className={styles.menuItem}>
+                <span className={styles.menuLabel}>Mode:</span>
+                <span className={styles.menuValue}>{isMaster ? 'Master' : 'Client'}</span>
+                <button onClick={handleToggleMode} className={styles.menuButton} style={{ marginTop: '0.5rem' }}>
+                  Switch to {isMaster ? 'Client' : 'Master'}
+                </button>
+              </div>
               <div className={styles.menuItem}>
                 <span className={styles.menuLabel}>Status:</span>
                 <span className={isConnected ? styles.connected : styles.disconnected}>
                   {isConnected ? '● Connected' : '○ Disconnected'}
                 </span>
               </div>
-              {previousSongTitle && (
-                <>
-                  <div className={styles.menuDivider} />
-                  <div className={styles.menuItem}>
-                    <span className={styles.menuLabel}>Previous:</span>
-                    <span className={styles.menuValue}>{previousSongTitle}</span>
-                  </div>
-                </>
+              {wakeLockActive && (
+                <div className={styles.menuItem}>
+                  <span className={styles.menuLabel}>Wake Lock:</span>
+                  <span className={styles.connected}>● Active</span>
+                </div>
               )}
               <div className={styles.menuDivider} />
               <div className={styles.menuItem}>
@@ -249,29 +344,35 @@ export default function ClientView() {
                 onClick={() => router.push('/')}
                 className={styles.menuButton}
               >
-                Leave Session
+                Back to Home
               </button>
             </HamburgerMenu>
           </div>
         </div>
       </div>
 
-      <div className={styles.content}>
-        {parsedDocument ? (
-          <ChordProRenderer
-            key={currentSongTitle || 'default'}
-            document={parsedDocument}
-            scrollPosition={scrollPosition}
-            targetLineIndex={targetLineIndex}
-            isMaster={false}
-            theme={theme}
-            textSize={textSize}
-          />
-        ) : (
-          <div className={styles.emptyState}>
-            <p>Waiting for master to load a file...</p>
-          </div>
-        )}
+      <div className={styles.mainContent}>
+        <div className={styles.content}>
+          {parsedDocument ? (
+            <ChordProRenderer
+              key={currentSongTitle || 'default'}
+              document={parsedDocument}
+              scrollPosition={scrollPosition}
+              scrollTopPercent={scrollTopPercent}
+              targetLineIndex={targetLineIndex}
+              isMaster={isMaster}
+              theme={theme}
+              textSize={textSize}
+            />
+          ) : (
+            <div className={styles.emptyState}>
+              <p>{isMaster ? 'Upload a ChordPro file to get started' : 'Waiting for master to load a file...'}</p>
+              <p className={styles.emptyStateHint}>
+                {isMaster ? 'Supported formats: .cho, .crd, .chopro, .chordpro, .txt' : ''}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

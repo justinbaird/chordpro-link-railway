@@ -2,7 +2,7 @@
   width: 100%;
   height: 100vh;
   overflow-y: auto;
-  overflow-x: auto; /* Allow horizontal scroll for long lines */
+  overflow-x: hidden; /* Prevent horizontal scroll on mobile */
   background: #ffffff;
   padding: 2rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -10,6 +10,14 @@
     sans-serif;
   line-height: 1.6;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Mobile optimization: prevent horizontal scroll */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+    overflow-x: hidden;
+  }
 }
 
 .container.dark {
@@ -157,11 +165,13 @@
   line-height: calc(var(--chord-line-height, 1.5rem));
   margin-bottom: 0.25rem;
   white-space: nowrap;
-  overflow-x: visible;
+  overflow-x: auto; /* Allow horizontal scroll for long chord lines */
   overflow-y: visible;
   position: relative;
   font-size: calc(var(--lyrics-size, 1.2rem)); /* Match lyrics font size for em calculations */
   min-width: min-content;
+  /* Mobile: prevent container scroll, allow line-level scroll */
+  max-width: 100%;
 }
 
 .chord {
@@ -200,5 +210,16 @@
 @media (max-width: 768px) {
   .container {
     padding: 1rem;
+    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+  }
+  
+  .chordLine {
+    overflow-x: auto; /* Allow scrolling within chord line on mobile */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  }
+  
+  .lyricsText {
+    word-break: break-word; /* Break long words on mobile */
+    overflow-wrap: anywhere; /* More aggressive wrapping */
   }
 }

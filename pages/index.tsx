@@ -10,15 +10,16 @@ export default function Home() {
   const [theme, setTheme] = useTheme();
 
   const handleCreateSession = () => {
+    // Create a new room and redirect to master view
     router.push('/master');
   };
 
   const handleJoinSession = (e: React.FormEvent) => {
     e.preventDefault();
     if (sessionId.trim()) {
-      // Normalize to lowercase for consistency
-      const normalizedSessionId = sessionId.trim().toLowerCase();
-      router.push(`/client?session=${encodeURIComponent(normalizedSessionId)}`);
+      // Normalize to uppercase for consistency
+      const normalizedRoomId = sessionId.trim().toUpperCase();
+      router.push(`/${normalizedRoomId}`);
     }
   };
 
@@ -53,7 +54,7 @@ export default function Home() {
                 type="text"
                 value={sessionId}
                 onChange={(e) => setSessionId(e.target.value)}
-                placeholder="e.g., blue-guitar"
+                placeholder="e.g., ABC123"
                 className={styles.input}
                 maxLength={30}
               />

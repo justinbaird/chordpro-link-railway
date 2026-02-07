@@ -6,7 +6,8 @@ import styles from './ChordProRenderer.module.css';
 interface ChordProRendererProps {
   document: ChordProDocument;
   scrollPosition?: number;
-  onScroll?: (position: number) => void;
+  scrollTopPercent?: number; // New: percentage-based scroll for better sync
+  onScroll?: (position: number, scrollTopPercent?: number, lineIndex?: number) => void;
   onLineScroll?: (lineIndex: number) => void; // New: send line index instead of pixel position
   isMaster?: boolean;
   theme?: Theme;
@@ -17,6 +18,7 @@ interface ChordProRendererProps {
 export default function ChordProRenderer({
   document,
   scrollPosition,
+  scrollTopPercent,
   onScroll,
   onLineScroll,
   isMaster = false,
@@ -50,11 +52,22 @@ export default function ChordProRenderer({
     }
   }, [document, isMaster, onScroll, onLineScroll]);
 
-  // Sync scroll position when it changes (for clients) - use line-based sync when available
+  // Sync scroll position when it changes (for clients) - use percentage-based sync when available
   React.useEffect(() => {
     if (!isMaster && containerRef.current) {
       // Only update scroll if document hasn't changed (to avoid interfering with document change scroll)
       if (previousDocumentRef.current === document) {
+        // Use percentage-based sync if available (best for different screen sizes)
+        if (scrollTopPercent !== undefined) {
+          const scrollHeight = containerRef.current.scrollHeight;
+          const clientHeight = containerRef.current.clientHeight;
+          const maxScroll = scrollHeight - clientHeight;
+          if (maxScroll > 0) {
+            containerRef.current.scrollTop = (scrollTopPercent / 100) * maxScroll;
+            return;
+          }
+        }
+        
         // Use line-based sync if available (better for different text sizes)
         if (targetLineIndex !== undefined && lineRefs.current.has(targetLineIndex)) {
           const targetLineElement = lineRefs.current.get(targetLineIndex);
@@ -71,23 +84,23 @@ export default function ChordProRenderer({
         }
       }
     }
-  }, [targetLineIndex, scrollPosition, isMaster, document]);
+  }, [scrollTopPercent, targetLineIndex, scrollPosition, isMaster, document]);
 
   // Track scroll for master
   const handleScroll = React.useCallback(() => {
     if (isMaster && containerRef.current) {
       const scrollTop = containerRef.current.scrollTop;
+      const scrollHeight = containerRef.current.scrollHeight;
+      const clientHeight = containerRef.current.clientHeight;
+      const maxScroll = scrollHeight - clientHeight;
       
-      // Send pixel position (primary sync method)
-      if (onScroll) {
-        onScroll(scrollTop);
-      }
+      // Calculate scroll percentage (best for sync across different screen sizes)
+      const scrollTopPercent = maxScroll > 0 ? (scrollTop / maxScroll) * 100 : 0;
       
-      // Also calculate and send line index for better sync across text sizes
-      if (onLineScroll && lineRefs.current.size > 0) {
-        let topLineIndex = 0;
+      // Calculate line index for better sync across text sizes
+      let topLineIndex: number | undefined = undefined;
+      if (lineRefs.current.size > 0) {
         let minDistance = Infinity;
-        
         lineRefs.current.forEach((element, index) => {
           if (element) {
             const elementTop = element.offsetTop;
@@ -100,7 +113,15 @@ export default function ChordProRenderer({
             }
           }
         });
-        
+      }
+      
+      // Send scroll data with percentage (primary sync method)
+      if (onScroll) {
+        onScroll(scrollTop, scrollTopPercent, topLineIndex);
+      }
+      
+      // Also send line index separately (legacy support)
+      if (onLineScroll && topLineIndex !== undefined) {
         onLineScroll(topLineIndex);
       }
     }

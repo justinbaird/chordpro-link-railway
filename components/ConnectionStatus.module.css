@@ -1,0 +1,77 @@
+.statusBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: #fff3cd;
+  color: #856404;
+  padding: 0.5rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.3s ease-out;
+}
+
+.statusBar.dark {
+  background: #3a2a1a;
+  color: #ff9800;
+}
+
+.statusBar.syncing {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.statusBar.dark.syncing {
+  background: #1a2a3a;
+  color: #4da6ff;
+}
+
+.statusBar.disconnected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.statusBar.dark.disconnected {
+  background: #3a1a1a;
+  color: #ff6b6b;
+}
+
+.statusContent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  font-size: 1rem;
+}
+
+.icon {
+  font-size: 1rem;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

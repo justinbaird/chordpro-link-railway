@@ -8,7 +8,8 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { SetlistItem } from '@/components/SetlistSidebar';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import TextSizeControls from '@/components/TextSizeControls';
-import { getStoredSessionId, setStoredSessionId, clearStoredSessionId, getStoredCurrentSongId, setStoredCurrentSongId, getCustomSessionName, setCustomSessionName as saveCustomSessionName } from '@/lib/sessionStorage';
+import { getStoredSessionId, setStoredSessionId, clearStoredSessionId, getStoredCurrentSongId, setStoredCurrentSongId, getCustomSessionName, setCustomSessionName as saveCustomSessionName, getStoredMasterSessionId, setStoredMasterSessionId } from '@/lib/sessionStorage';
+import ConnectionStatus from '@/components/ConnectionStatus';
 import { getStoredSetlist, setStoredSetlist, clearStoredSetlist } from '@/lib/setlistStorage';
 import { storeFile, getFile, getFilesBySession, deleteFile, migrateFilesToNewSession } from '@/lib/fileStorage';
 import { getStoredTextSize, setStoredTextSize } from '@/lib/textSizeStorage';
@@ -29,6 +30,7 @@ export default function MasterView() {
   const [isLoading, setIsLoading] = useState(true);
   const [scrollPosition, setScrollPosition] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useTheme();
   const [setlist, setSetlist] = useState<SetlistItem[]>([]);
   const [currentSongId, setCurrentSongId] = useState<string | null>(null);
@@ -41,23 +43,47 @@ export default function MasterView() {
   const [customSessionName, setCustomSessionName] = useState<string>('');
   const [draggedSetlistItem, setDraggedSetlistItem] = useState<string | null>(null);
   const [dragOverSetlistIndex, setDragOverSetlistIndex] = useState<number | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'syncing'>('disconnected');
+  const [masterSessionId, setMasterSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoading(true);
     const client = new SocketClient();
     
+    // Listen for connection status changes
+    client.onConnectionStatusChange((status) => {
+      setConnectionStatus(status);
+      setIsConnected(status === 'connected');
+    });
+    
     client.connect().then(() => {
       console.log('Socket connected');
       setIsConnected(true);
+      setConnectionStatus('connected');
       
-      // Try to use stored session ID, or create new one
-      const storedSessionId = getStoredSessionId();
-      if (storedSessionId) {
-        console.log('Found stored session ID, attempting to join:', storedSessionId);
-        return client.joinOrCreateSession(storedSessionId);
+      // Check if room ID is provided in query params
+      const { room: roomIdParam } = router.query;
+      
+      // Get stored master session ID if available
+      let storedMasterSessionId: string | null = null;
+      
+      // Try to use room ID from query params, stored session ID, or create new one
+      if (roomIdParam && typeof roomIdParam === 'string') {
+        const normalizedRoomId = roomIdParam.toUpperCase().trim();
+        storedMasterSessionId = getStoredMasterSessionId(normalizedRoomId);
+        console.log('Found room ID in query params, attempting to join:', normalizedRoomId, storedMasterSessionId ? `(master session: ${storedMasterSessionId})` : '');
+        return client.joinSession(normalizedRoomId, storedMasterSessionId || undefined);
       } else {
-        console.log('No stored session ID, creating new session...');
-        return client.createSession();
+        const storedSessionId = getStoredSessionId();
+        if (storedSessionId) {
+          const normalizedRoomId = storedSessionId.toUpperCase().trim();
+          storedMasterSessionId = getStoredMasterSessionId(normalizedRoomId);
+          console.log('Found stored session ID, attempting to join:', normalizedRoomId, storedMasterSessionId ? `(master session: ${storedMasterSessionId})` : '');
+          return client.joinSession(normalizedRoomId, storedMasterSessionId || undefined);
+        } else {
+          console.log('No stored session ID, creating new room...');
+          return client.createRoom();
+        }
       }
     }).then((sessionInfo) => {
       console.log('Session ready:', sessionInfo);
@@ -65,6 +91,17 @@ export default function MasterView() {
       // Set session ID (this will only happen once on initial load)
       setSessionId(finalSessionId);
       setStoredSessionId(finalSessionId);
+      
+      // Store master session ID if we're the master
+      if (sessionInfo.isMaster && sessionInfo.masterSessionId) {
+        setMasterSessionId(sessionInfo.masterSessionId);
+        setStoredMasterSessionId(finalSessionId, sessionInfo.masterSessionId);
+        console.log('Stored master session ID:', sessionInfo.masterSessionId);
+      } else if (sessionInfo.masterSessionId) {
+        // Store it even if we're not master (for future reference)
+        setStoredMasterSessionId(finalSessionId, sessionInfo.masterSessionId);
+      }
+      
       setSocketClient(client);
       setSessionIdEditValue(finalSessionId); // Initialize edit value
       
@@ -152,9 +189,17 @@ export default function MasterView() {
       }
       
       const client = new SocketClient();
+      
+      // Listen for connection status changes
+      client.onConnectionStatusChange((status) => {
+        setConnectionStatus(status);
+        setIsConnected(status === 'connected');
+      });
+      
       client.connect().then(() => {
         setIsConnected(true);
-        return client.createSession();
+        setConnectionStatus('connected');
+        return client.createRoom();
       }).then((sessionInfo) => {
         console.log('New session created:', sessionInfo);
         setSessionId(sessionInfo.sessionId);
@@ -200,9 +245,10 @@ export default function MasterView() {
       return;
     }
     
-    // Validate format (two words separated by hyphen)
-    if (!/^[a-z]+-[a-z]+$/.test(customId)) {
-      alert('Session ID must be in format: word-word (e.g., blue-guitar)');
+    // Validate format (4-6 alphanumeric characters)
+    const normalizedId = customId.toUpperCase().trim();
+    if (!/^[A-Z0-9]{4,6}$/.test(normalizedId)) {
+      alert('Room ID must be 4-6 alphanumeric characters (e.g., ABC123)');
       return;
     }
     
@@ -214,9 +260,17 @@ export default function MasterView() {
     }
     
     const client = new SocketClient();
+    
+    // Listen for connection status changes
+    client.onConnectionStatusChange((status) => {
+      setConnectionStatus(status);
+      setIsConnected(status === 'connected');
+    });
+    
     client.connect().then(() => {
       setIsConnected(true);
-      return client.createSession(customId);
+      setConnectionStatus('connected');
+      return client.createRoom(normalizedId);
     }).then((sessionInfo) => {
       console.log('Custom session created:', sessionInfo);
       const finalSessionId = sessionInfo.sessionId;
@@ -315,12 +369,14 @@ export default function MasterView() {
       ? listToUse[currentIndex - 1] 
       : null;
     
-    // Send to clients
+    // Send to clients using unified content-change event
     if (socketClient) {
-      socketClient.updateDocument(item.content);
-      socketClient.updateCurrentSong(displayTitle);
-      socketClient.updateUpNext(nextItem ? nextItem.title : '');
-      socketClient.updatePreviousSong(previousItem ? previousItem.title : '');
+      socketClient.updateContent({
+        document: item.content,
+        currentSongTitle: displayTitle,
+        upNextTitle: nextItem ? nextItem.title : '',
+        previousSongTitle: previousItem ? previousItem.title : '',
+      });
       // Scroll to top when new song is loaded
       socketClient.updateScroll(0);
     }
@@ -328,18 +384,20 @@ export default function MasterView() {
 
   const handleSetlistReorder = (newItems: SetlistItem[]) => {
     setSetlist(newItems);
-    // Update up next and previous if we have a current song
-    if (currentSongId && socketClient) {
-      const currentIndex = newItems.findIndex((s) => s.id === currentSongId);
-      const nextItem = currentIndex >= 0 && currentIndex < newItems.length - 1 
-        ? newItems[currentIndex + 1] 
-        : null;
-      const previousItem = currentIndex > 0 
-        ? newItems[currentIndex - 1] 
-        : null;
-      socketClient.updateUpNext(nextItem ? nextItem.title : '');
-      socketClient.updatePreviousSong(previousItem ? previousItem.title : '');
-    }
+      // Update up next and previous if we have a current song
+      if (currentSongId && socketClient) {
+        const currentIndex = newItems.findIndex((s) => s.id === currentSongId);
+        const nextItem = currentIndex >= 0 && currentIndex < newItems.length - 1 
+          ? newItems[currentIndex + 1] 
+          : null;
+        const previousItem = currentIndex > 0 
+          ? newItems[currentIndex - 1] 
+          : null;
+        socketClient.updateContent({
+          upNextTitle: nextItem ? nextItem.title : '',
+          previousSongTitle: previousItem ? previousItem.title : '',
+        });
+      }
   };
 
   const handleSetlistDelete = async (id: string) => {
@@ -362,10 +420,12 @@ export default function MasterView() {
           setParsedDocument(null);
           setCurrentSongTitle('');
           if (socketClient) {
-            socketClient.updateDocument('');
-            socketClient.updateCurrentSong('');
-            socketClient.updateUpNext('');
-            socketClient.updatePreviousSong('');
+            socketClient.updateContent({
+              document: '',
+              currentSongTitle: '',
+              upNextTitle: '',
+              previousSongTitle: '',
+            });
           }
         }
       } else if (socketClient && currentSongId) {
@@ -377,23 +437,41 @@ export default function MasterView() {
         const previousItem = currentIndex > 0 
           ? newSetlist[currentIndex - 1] 
           : null;
-        socketClient.updateUpNext(nextItem ? nextItem.title : '');
-        socketClient.updatePreviousSong(previousItem ? previousItem.title : '');
+        socketClient.updateContent({
+          upNextTitle: nextItem ? nextItem.title : '',
+          previousSongTitle: previousItem ? previousItem.title : '',
+        });
       }
       return newSetlist;
     });
   };
 
-  const handleScroll = (position: number) => {
+  const handleScroll = (position: number, scrollTopPercent?: number, lineIndex?: number) => {
     setScrollPosition(position);
-    if (socketClient) {
-      socketClient.updateScroll(position);
+    if (socketClient && sessionId) {
+      // Use new sync-scroll event with scrollTopPercent
+      if (scrollTopPercent !== undefined) {
+        socketClient.syncScroll(sessionId, scrollTopPercent, position, lineIndex);
+      } else {
+        // Fallback to legacy method
+        socketClient.updateScroll(position);
+        if (lineIndex !== undefined) {
+          socketClient.updateLineScroll(lineIndex);
+        }
+      }
     }
   };
 
   const handleLineScroll = (lineIndex: number) => {
-    if (socketClient) {
-      socketClient.updateLineScroll(lineIndex);
+    // This is called from ChordProRenderer, scroll position is already calculated there
+    // Just ensure we sync if needed
+    if (socketClient && sessionId && containerRef.current) {
+      const scrollTop = containerRef.current.scrollTop;
+      const scrollHeight = containerRef.current.scrollHeight;
+      const clientHeight = containerRef.current.clientHeight;
+      const maxScroll = scrollHeight - clientHeight;
+      const scrollTopPercent = maxScroll > 0 ? (scrollTop / maxScroll) * 100 : 0;
+      socketClient.syncScroll(sessionId, scrollTopPercent, scrollTop, lineIndex);
     }
   };
 
@@ -401,10 +479,35 @@ export default function MasterView() {
     const idToCopy = sessionId || '';
     if (idToCopy) {
       navigator.clipboard.writeText(idToCopy).then(() => {
-        alert(`Session ID copied to clipboard: ${idToCopy}`);
+        alert(`Room ID copied to clipboard: ${idToCopy}`);
       }).catch(() => {
-        alert('Failed to copy session ID');
+        alert('Failed to copy room ID');
       });
+    }
+  };
+
+  const handleShareRoom = async () => {
+    if (!sessionId) return;
+    
+    const url = `${window.location.origin}/${sessionId}`;
+    
+    if (navigator.share) {
+      // Use native share sheet on mobile
+      try {
+        await navigator.share({
+          title: 'Join ChordPro Session',
+          text: `Join my ChordPro session: ${sessionId}`,
+          url: url,
+        });
+      } catch (err) {
+        // User cancelled or error - fallback to clipboard
+        navigator.clipboard.writeText(url);
+        alert(`Room URL copied to clipboard: ${url}`);
+      }
+    } else {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(url);
+      alert(`Room URL copied to clipboard: ${url}`);
     }
   };
 
@@ -421,12 +524,12 @@ export default function MasterView() {
       return;
     }
     
-    const newSessionId = sessionIdEditValue.trim().toLowerCase();
-    console.log('New session ID:', newSessionId);
+    const newSessionId = sessionIdEditValue.trim().toUpperCase();
+    console.log('New room ID:', newSessionId);
     
-    // Validate session ID format (alphanumeric with hyphens, similar to generated IDs)
-    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(newSessionId)) {
-      alert('Session ID must contain only lowercase letters, numbers, and hyphens (e.g., "blue-guitar")');
+    // Validate room ID format (4-6 alphanumeric characters)
+    if (!/^[A-Z0-9]{4,6}$/.test(newSessionId)) {
+      alert('Room ID must be 4-6 alphanumeric characters (e.g., ABC123)');
       return;
     }
     
@@ -492,13 +595,26 @@ export default function MasterView() {
       setIsLoading(true);
       const client = new SocketClient();
       
+      // Listen for connection status changes
+      client.onConnectionStatusChange((status) => {
+        setConnectionStatus(status);
+        setIsConnected(status === 'connected');
+      });
+      
       await client.connect();
       console.log('Socket connected');
       setIsConnected(true);
+      setConnectionStatus('connected');
       
-      console.log('Step 8: Creating session with new ID:', newSessionId);
-      // Create session with the new custom ID
-      const sessionInfo = await client.createSession(newSessionId);
+      console.log('Step 8: Creating room with new ID:', newSessionId);
+      // Create room with the new custom ID
+      const sessionInfo = await client.createRoom(newSessionId);
+      
+      // Store master session ID
+      if (sessionInfo.isMaster && sessionInfo.masterSessionId) {
+        setMasterSessionId(sessionInfo.masterSessionId);
+        setStoredMasterSessionId(newSessionId, sessionInfo.masterSessionId);
+      }
       console.log('Session created:', sessionInfo);
       
       if (sessionInfo.sessionId !== newSessionId) {
@@ -539,13 +655,25 @@ export default function MasterView() {
         socketClient.disconnect();
       }
       const client = new SocketClient();
+      
+      // Listen for connection status changes
+      client.onConnectionStatusChange((status) => {
+        setConnectionStatus(status);
+        setIsConnected(status === 'connected');
+      });
+      
       try {
         await client.connect();
-        const sessionInfo = await client.joinOrCreateSession(oldSessionId);
+        const storedMasterSessionId = getStoredMasterSessionId(oldSessionId.toUpperCase().trim());
+        const sessionInfo = await client.joinSession(oldSessionId.toUpperCase().trim(), storedMasterSessionId || undefined);
         setSessionId(oldSessionId);
         setSessionIdEditValue(oldSessionId);
         setSocketClient(client);
         setIsConnected(true);
+        setConnectionStatus('connected');
+        if (sessionInfo.masterSessionId) {
+          setMasterSessionId(sessionInfo.masterSessionId);
+        }
         alert('Reconnected to original session');
       } catch (reconnectError) {
         console.error('Failed to reconnect to old session:', reconnectError);
@@ -589,6 +717,7 @@ export default function MasterView() {
 
   return (
     <div className={`${styles.container} ${theme === 'dark' ? styles.dark : ''}`}>
+      <ConnectionStatus status={connectionStatus} theme={theme} />
       <div className={styles.header}>
         <div className={styles.headerContent}>
           <div className={styles.headerLeft}>
@@ -635,7 +764,7 @@ export default function MasterView() {
               ) : sessionId ? (
                 <>
                   <div className={styles.menuItem}>
-                    <span className={styles.menuLabel}>Session ID:</span>
+                    <span className={styles.menuLabel}>Room ID:</span>
                     <div className={styles.menuSessionId}>
                       {editingSessionId ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
@@ -644,7 +773,7 @@ export default function MasterView() {
                             value={sessionIdEditValue}
                             onChange={(e) => setSessionIdEditValue(e.target.value)}
                             className={styles.menuInput}
-                            placeholder="e.g., blue-guitar"
+                            placeholder="e.g., ABC123"
                             maxLength={50}
                             autoFocus
                             onKeyDown={(e) => {
@@ -706,6 +835,9 @@ export default function MasterView() {
                             <button onClick={handleCopySessionId} className={styles.copyButton}>
                               Copy
                             </button>
+                            <button onClick={handleShareRoom} className={styles.copyButton} style={{ marginLeft: '0.25rem' }}>
+                              Share
+                            </button>
                           </div>
                         </>
                       )}
@@ -732,18 +864,18 @@ export default function MasterView() {
                       onClick={() => setShowSessionIdInput(true)}
                       className={styles.menuButton}
                     >
-                      Set Custom Session ID
+                      Set Custom Room ID
                     </button>
                   ) : (
                     <div className={styles.menuItem}>
-                      <label className={styles.menuLabel}>Custom Session ID:</label>
+                      <label className={styles.menuLabel}>Custom Room ID:</label>
                       <input
                         type="text"
                         value={customSessionIdInput}
                         onChange={(e) => setCustomSessionIdInput(e.target.value)}
-                        placeholder="e.g., blue-guitar"
+                        placeholder="e.g., ABC123"
                         className={styles.menuInput}
-                        pattern="[a-z]+-[a-z]+"
+                        pattern="[A-Z0-9]{4,6}"
                       />
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                         <button

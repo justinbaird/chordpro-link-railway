@@ -1,18 +1,22 @@
 {
   "name": "chordpro-link",
   "version": "0.1.0",
-  "description": "Real-time synchronized ChordPro chord chart viewer - localhost/development version",
+  "description": "Real-time synchronized ChordPro chord chart viewer for chordpro.link",
   "private": true,
+  "engines": {
+    "node": ">=18.x"
+  },
   "scripts": {
     "dev": "node server.js",
     "build": "next build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "node server.js",
     "lint": "next lint"
   },
   "dependencies": {
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "express": "^4.18.2",
     "ws": "^8.18.0",
     "socket.io": "^4.7.0",
     "socket.io-client": "^4.7.0"

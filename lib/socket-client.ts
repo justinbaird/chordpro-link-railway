@@ -7,8 +7,10 @@ import { io, Socket } from 'socket.io-client';
 export interface SessionInfo {
   sessionId: string;
   isMaster: boolean;
+  masterSessionId?: string;
   document?: string;
   scrollPosition?: number;
+  scrollTopPercent?: number;
   lineIndex?: number;
   currentSongTitle?: string;
   upNextTitle?: string;
@@ -18,7 +20,9 @@ export interface SessionInfo {
 export class SocketClient {
   private socket: Socket | null = null;
   private sessionId: string | null = null;
+  private masterSessionId: string | null = null;
   private isMaster: boolean = false;
+  private connectionStatusCallbacks: Array<(status: 'connected' | 'disconnected' | 'syncing') => void> = [];
 
   constructor() {
     // Socket will be initialized when connecting
@@ -26,37 +30,67 @@ export class SocketClient {
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const socketUrl = typeof window !== 'undefined' 
-        ? window.location.origin 
-        : 'http://localhost:3000';
+      // Use environment variable for socket URL, fallback to current origin
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL 
+        || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
       
       console.log('Attempting to connect to:', socketUrl);
       
       this.socket = io(socketUrl, {
         path: '/api/socket',
-        transports: ['websocket', 'polling'],
+        transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: Infinity, // Keep trying to reconnect
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        forceNew: false, // Reuse connection when possible
       });
 
       this.socket.on('connect', () => {
         console.log('Connected to server, socket ID:', this.socket?.id);
+        this.notifyConnectionStatus('connected');
+        
+        // If we had a previous session, try to reconnect to it
+        if (this.sessionId && this.masterSessionId) {
+          this.joinSession(this.sessionId, this.masterSessionId).catch((err) => {
+            console.error('Failed to reconnect to session:', err);
+          });
+        }
+        
         resolve();
       });
 
       this.socket.on('connect_error', (error) => {
         console.error('Connection error:', error);
-        reject(error);
+        this.notifyConnectionStatus('disconnected');
+        // Don't reject on initial connect error - let reconnection handle it
+        if (!this.socket?.connected) {
+          reject(error);
+        }
       });
 
       this.socket.on('disconnect', (reason) => {
         console.log('Disconnected:', reason);
+        this.notifyConnectionStatus('disconnected');
+        // Socket.io will automatically attempt to reconnect
+      });
+
+      this.socket.on('reconnect', (attemptNumber) => {
+        console.log('Reconnected after', attemptNumber, 'attempts');
+        this.notifyConnectionStatus('syncing');
+        // Try to rejoin session if we had one
+        if (this.sessionId && this.masterSessionId) {
+          this.joinSession(this.sessionId, this.masterSessionId).catch((err) => {
+            console.error('Failed to reconnect to session after socket reconnect:', err);
+          });
+        }
       });
     });
   }
 
-  createSession(customSessionId?: string): Promise<SessionInfo> {
+  // New unified join-session event
+  joinSession(roomID: string, masterSessionId?: string): Promise<SessionInfo> {
     return new Promise((resolve, reject) => {
       if (!this.socket) {
         reject(new Error('Socket not connected'));
@@ -68,10 +102,11 @@ export class SocketClient {
         return;
       }
 
-      console.log('Emitting create-session event', customSessionId ? `with custom ID: ${customSessionId}` : '');
+      const normalizedRoomId = roomID.toUpperCase().trim();
+      console.log('Joining session:', normalizedRoomId, masterSessionId ? `(master session: ${masterSessionId})` : '');
       
-      this.socket.emit('create-session', customSessionId || null, (response: SessionInfo | { error: string }) => {
-        console.log('Received create-session response:', response);
+      this.socket.emit('join-session', normalizedRoomId, masterSessionId || null, (response: SessionInfo | { error: string }) => {
+        console.log('Received join-session response:', response);
         
         if (!response) {
           reject(new Error('No response from server'));
@@ -85,59 +120,80 @@ export class SocketClient {
 
         this.sessionId = response.sessionId;
         this.isMaster = response.isMaster;
+        this.masterSessionId = response.masterSessionId || null;
         resolve(response);
       });
-
-      // Timeout after 5 seconds
-      setTimeout(() => {
-        if (!this.sessionId) {
-          reject(new Error('Session creation timeout'));
-        }
-      }, 5000);
     });
   }
 
-  joinSession(sessionId: string): Promise<SessionInfo> {
+  // Sync scroll - Master broadcasts scroll percentage
+  syncScroll(roomID: string, scrollTopPercent: number, scrollPosition?: number, lineIndex?: number): void {
+    if (!this.socket || !this.sessionId || !this.isMaster) {
+      return;
+    }
+
+    this.socket.emit('sync-scroll', {
+      roomID: roomID.toUpperCase().trim(),
+      scrollTopPercent,
+      scrollPosition,
+      lineIndex,
+    });
+  }
+
+  // Legacy methods for backward compatibility
+  createRoom(customRoomId?: string): Promise<SessionInfo> {
     return new Promise((resolve, reject) => {
       if (!this.socket) {
         reject(new Error('Socket not connected'));
         return;
       }
 
-      this.socket.emit('join-session', sessionId, (response: SessionInfo | { error: string }) => {
-        if ('error' in response) {
-          reject(new Error(response.error));
-          return;
-        }
-
-        this.sessionId = response.sessionId;
-        this.isMaster = response.isMaster;
-        resolve(response);
-      });
-    });
-  }
-
-  joinOrCreateSession(sessionId: string): Promise<SessionInfo> {
-    return new Promise((resolve, reject) => {
-      if (!this.socket) {
-        reject(new Error('Socket not connected'));
+      if (!this.socket.connected) {
+        reject(new Error('Socket is not connected'));
         return;
       }
 
-      // Try to join existing session first
-      this.socket.emit('join-session', sessionId, (response: SessionInfo | { error: string }) => {
-        if ('error' in response) {
-          // Session doesn't exist, create a new one
-          console.log('Session not found, creating new session');
-          this.createSession().then(resolve).catch(reject);
-          return;
-        }
-
-        this.sessionId = response.sessionId;
-        this.isMaster = response.isMaster;
-        resolve(response);
-      });
+      // Use join-session to create room (first person becomes master)
+      const roomId = customRoomId ? customRoomId.toUpperCase().trim() : null;
+      if (roomId) {
+        this.joinSession(roomId).then(resolve).catch(reject);
+      } else {
+        // Generate a room ID and try to join
+        const generatedId = this.generateRoomId();
+        this.joinSession(generatedId).then(resolve).catch(reject);
+      }
     });
+  }
+
+  private generateRoomId(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let roomId = '';
+    const length = 4 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < length; i++) {
+      roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return roomId;
+  }
+
+  joinRoom(roomId: string): Promise<SessionInfo> {
+    return this.joinSession(roomId);
+  }
+
+  reconnectToRoom(roomId: string, masterSessionId?: string): Promise<SessionInfo> {
+    return this.joinSession(roomId, masterSessionId || this.masterSessionId || undefined);
+  }
+
+  joinOrCreateRoom(roomId: string): Promise<SessionInfo> {
+    return this.joinSession(roomId);
+  }
+
+  // Legacy method name for backward compatibility
+  createSession(customSessionId?: string): Promise<SessionInfo> {
+    return this.createRoom(customSessionId);
+  }
+
+  joinSession(roomId: string): Promise<SessionInfo> {
+    return this.joinSession(roomId);
   }
 
   updateDocument(document: string): void {
@@ -145,9 +201,26 @@ export class SocketClient {
       return;
     }
 
-    this.socket.emit('update-document', {
-      sessionId: this.sessionId,
+    // Use new content-change event
+    this.socket.emit('content-change', {
+      roomId: this.sessionId,
       document,
+    });
+  }
+
+  updateContent(data: {
+    document?: string;
+    currentSongTitle?: string;
+    upNextTitle?: string;
+    previousSongTitle?: string;
+  }): void {
+    if (!this.socket || !this.sessionId || !this.isMaster) {
+      return;
+    }
+
+    this.socket.emit('content-change', {
+      roomId: this.sessionId,
+      ...data,
     });
   }
 
@@ -156,8 +229,8 @@ export class SocketClient {
       return;
     }
 
-    this.socket.emit('update-scroll', {
-      sessionId: this.sessionId,
+    this.socket.emit('scroll-update', {
+      roomId: this.sessionId,
       scrollPosition,
     });
   }
@@ -167,8 +240,8 @@ export class SocketClient {
       return;
     }
 
-    this.socket.emit('update-line-scroll', {
-      sessionId: this.sessionId,
+    this.socket.emit('line-scroll-update', {
+      roomId: this.sessionId,
       lineIndex,
     });
   }
@@ -179,6 +252,26 @@ export class SocketClient {
     this.socket.on('document-updated', (data: { document: string }) => {
       callback(data.document);
     });
+
+    // Also listen for new content-updated event
+    this.socket.on('content-updated', (data: { document?: string }) => {
+      if (data.document !== undefined) {
+        callback(data.document);
+      }
+    });
+  }
+
+  onContentUpdate(callback: (data: {
+    document?: string;
+    currentSongTitle?: string;
+    upNextTitle?: string;
+    previousSongTitle?: string;
+  }) => void): void {
+    if (!this.socket) return;
+
+    this.socket.on('content-updated', (data) => {
+      callback(data);
+    });
   }
 
   onScrollUpdate(callback: (scrollPosition: number) => void): void {
@@ -186,6 +279,15 @@ export class SocketClient {
 
     this.socket.on('scroll-updated', (data: { scrollPosition: number }) => {
       callback(data.scrollPosition);
+    });
+  }
+
+  // Listen for new sync-scroll event
+  onScrollSynced(callback: (data: { scrollTopPercent: number; scrollPosition: number; lineIndex?: number }) => void): void {
+    if (!this.socket) return;
+
+    this.socket.on('scroll-synced', (data) => {
+      callback(data);
     });
   }
 
@@ -198,36 +300,15 @@ export class SocketClient {
   }
 
   updateCurrentSong(songTitle: string): void {
-    if (!this.socket || !this.sessionId || !this.isMaster) {
-      return;
-    }
-
-    this.socket.emit('update-current-song', {
-      sessionId: this.sessionId,
-      songTitle,
-    });
+    this.updateContent({ currentSongTitle: songTitle });
   }
 
   updateUpNext(upNextTitle: string): void {
-    if (!this.socket || !this.sessionId || !this.isMaster) {
-      return;
-    }
-
-    this.socket.emit('update-up-next', {
-      sessionId: this.sessionId,
-      upNextTitle,
-    });
+    this.updateContent({ upNextTitle });
   }
 
   updatePreviousSong(previousTitle: string): void {
-    if (!this.socket || !this.sessionId || !this.isMaster) {
-      return;
-    }
-
-    this.socket.emit('update-previous-song', {
-      sessionId: this.sessionId,
-      previousTitle,
-    });
+    this.updateContent({ previousSongTitle });
   }
 
   onCurrentSongUpdate(callback: (songTitle: string) => void): void {
@@ -260,6 +341,21 @@ export class SocketClient {
     this.socket.on('session-closed', () => {
       callback();
     });
+
+    // Also listen for new room-closed event
+    this.socket.on('room-closed', (data: { reason?: string }) => {
+      console.log('Room closed:', data.reason);
+      callback();
+    });
+  }
+
+  // Connection status monitoring
+  onConnectionStatusChange(callback: (status: 'connected' | 'disconnected' | 'syncing') => void): void {
+    this.connectionStatusCallbacks.push(callback);
+  }
+
+  private notifyConnectionStatus(status: 'connected' | 'disconnected' | 'syncing'): void {
+    this.connectionStatusCallbacks.forEach(callback => callback(status));
   }
 
   disconnect(): void {
@@ -268,11 +364,16 @@ export class SocketClient {
       this.socket = null;
     }
     this.sessionId = null;
+    this.masterSessionId = null;
     this.isMaster = false;
   }
 
   getSessionId(): string | null {
     return this.sessionId;
+  }
+
+  getMasterSessionId(): string | null {
+    return this.masterSessionId;
   }
 
   getIsMaster(): boolean {

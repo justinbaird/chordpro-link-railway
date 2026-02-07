@@ -1,56 +1,75 @@
+const express = require('express');
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
-const port = process.env.PORT || 3000;
+const hostname = process.env.HOSTNAME || 'localhost';
+const PORT = process.env.PORT || 3000;
 
-const app = next({ dev, hostname, port });
+const app = next({ dev, hostname, port: PORT });
 const handle = app.getRequestHandler();
 
-const sessions = new Map();
+// Room data storage (in production, consider Redis or database)
+const rooms = new Map();
+// Track master session IDs for sticky master functionality
+const masterSessions = new Map(); // roomId -> masterSessionId
 
-// Word lists for easy-to-communicate session IDs
-const firstWords = [
-  'blue', 'red', 'green', 'yellow', 'black', 'white', 'purple', 'orange',
-  'big', 'small', 'fast', 'slow', 'hot', 'cold', 'loud', 'quiet',
-  'rock', 'jazz', 'blues', 'folk', 'pop', 'metal', 'punk', 'soul',
-  'star', 'moon', 'sun', 'wave', 'fire', 'wind', 'rain', 'snow',
-  'lion', 'tiger', 'eagle', 'shark', 'wolf', 'bear', 'hawk', 'fox'
-];
-
-const secondWords = [
-  'guitar', 'piano', 'drums', 'bass', 'voice', 'violin', 'trumpet', 'sax',
-  'river', 'ocean', 'mountain', 'valley', 'forest', 'desert', 'island', 'beach',
-  'apple', 'banana', 'cherry', 'grape', 'lemon', 'orange', 'peach', 'berry',
-  'house', 'castle', 'tower', 'bridge', 'temple', 'palace', 'cabin', 'lodge',
-  'dancer', 'singer', 'player', 'master', 'hero', 'king', 'queen', 'star'
-];
-
-function generateSessionId() {
-  const firstWord = firstWords[Math.floor(Math.random() * firstWords.length)];
-  const secondWord = secondWords[Math.floor(Math.random() * secondWords.length)];
-  return `${firstWord}-${secondWord}`;
+// Generate 4-6 character room ID
+function generateRoomId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars (0, O, I, 1)
+  let roomId = '';
+  const length = 4 + Math.floor(Math.random() * 3); // 4-6 characters
+  
+  for (let i = 0; i < length; i++) {
+    roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  return roomId;
 }
 
-// Initialize session data structure
-function createSession(masterId) {
+// Initialize room data structure
+function createRoom(masterSocketId, roomId, masterSessionId = null) {
   return {
-    masterId,
+    roomId,
+    masterSocketId,
+    masterSessionId: masterSessionId || `master-${Date.now()}-${Math.random().toString(36).substring(7)}`,
     document: '',
     scrollPosition: 0,
+    scrollTopPercent: 0, // Percentage-based scroll for better sync
     lineIndex: 0,
     currentSongTitle: '',
     upNextTitle: '',
     previousSongTitle: '',
-    clients: new Set([masterId]),
+    createdAt: Date.now(),
   };
 }
 
 app.prepare().then(() => {
-  const httpServer = createServer(async (req, res) => {
+  const server = express();
+  const httpServer = createServer(server);
+
+  // Socket.io server with CORS and connection recovery for cloud deployment
+  const io = new Server(httpServer, {
+    path: '/api/socket',
+    cors: {
+      origin: dev 
+        ? ['http://localhost:3000', 'http://127.0.0.1:3000']
+        : ['https://chordpro.link', 'https://www.chordpro.link'],
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
+    transports: ['websocket', 'polling'], // Support both for better connectivity
+    connectionStateRecovery: {
+      // Enable connection state recovery for mobile signal drops
+      maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+      skipMiddlewares: true,
+    },
+  });
+
+  // Express routes
+  server.all('*', async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
       await handle(req, res, parsedUrl);
@@ -61,189 +80,189 @@ app.prepare().then(() => {
     }
   });
 
-  const io = new Server(httpServer, {
-    path: '/api/socket',
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-    },
-  });
-
+  // Socket.io connection handling
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
-    // Create a new session
-    socket.on('create-session', (customSessionId, callback) => {
-      // Handle both old format (callback as second arg) and new format (customSessionId, callback)
-      let actualCustomId = null;
-      let actualCallback = callback;
-      
-      if (typeof customSessionId === 'function') {
-        // Old format: no custom ID provided
-        actualCallback = customSessionId;
-      } else {
-        // New format: custom ID provided
-        actualCustomId = customSessionId ? customSessionId.toLowerCase().trim() : null;
-      }
-      
-      console.log(`create-session event received from ${socket.id}`, actualCustomId ? `with custom ID: ${actualCustomId}` : '');
-      
-      let sessionId;
-      
-      if (actualCustomId) {
-        // Check if session already exists
-        if (sessions.has(actualCustomId)) {
-          console.log(`Session ${actualCustomId} already exists`);
-          if (actualCallback && typeof actualCallback === 'function') {
-            actualCallback({ error: 'Session ID already exists' });
-          }
-          return;
-        }
-        sessionId = actualCustomId;
-      } else {
-        // Generate new session ID
-        sessionId = generateSessionId();
-      }
-      
-      sessions.set(sessionId, createSession(socket.id));
-      
-      socket.join(sessionId);
-      console.log(`Session created: ${sessionId} by ${socket.id}`);
-      console.log('Total sessions:', sessions.size);
-      
-      if (actualCallback && typeof actualCallback === 'function') {
-        actualCallback({ sessionId, isMaster: true });
-      } else {
-        console.error('Callback is not a function:', typeof actualCallback);
-      }
-    });
-
-    // Join an existing session
-    socket.on('join-session', (sessionId, callback) => {
-      const session = sessions.get(sessionId);
-      
-      if (!session) {
-        console.log(`Session ${sessionId} not found`);
-        if (callback && typeof callback === 'function') {
-          callback({ error: 'Session not found' });
-        }
+    // Join session - unified event for both master and client
+    socket.on('join-session', (roomID, masterSessionId, callback) => {
+      if (!roomID || typeof roomID !== 'string') {
+        if (callback) callback({ error: 'Invalid room ID' });
         return;
       }
 
-      socket.join(sessionId);
-      session.clients.add(socket.id);
-      
-      console.log(`Client ${socket.id} joined session ${sessionId}`);
-      console.log(`Session document length: ${session.document ? session.document.length : 0}`);
-      console.log(`Session document preview: ${session.document ? session.document.substring(0, 100) : 'empty'}`);
-      
-      if (callback && typeof callback === 'function') {
-        callback({
-          sessionId,
-          isMaster: session.masterId === socket.id,
-          document: session.document || '',
-          scrollPosition: session.scrollPosition,
-          lineIndex: session.lineIndex !== undefined ? session.lineIndex : 0,
-          currentSongTitle: session.currentSongTitle || '',
-          upNextTitle: session.upNextTitle || '',
-          previousSongTitle: session.previousSongTitle || '',
-        });
-      }
-    });
+      const normalizedRoomId = roomID.toUpperCase().trim();
+      let room = rooms.get(normalizedRoomId);
+      let isMaster = false;
 
-    // Master updates document
-    socket.on('update-document', (data) => {
-      const session = sessions.get(data.sessionId);
-      
-      if (session && session.masterId === socket.id) {
-        console.log(`Master ${socket.id} updating document for session ${data.sessionId}`);
-        console.log(`Document length: ${data.document ? data.document.length : 0}`);
-        session.document = data.document;
-        socket.to(data.sessionId).emit('document-updated', {
-          document: data.document,
-        });
-        console.log(`Document update broadcasted to ${session.clients.size - 1} clients`);
+      if (!room) {
+        // Room doesn't exist - first person to join becomes master
+        const newMasterSessionId = masterSessionId || `master-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        room = createRoom(socket.id, normalizedRoomId, newMasterSessionId);
+        rooms.set(normalizedRoomId, room);
+        masterSessions.set(normalizedRoomId, newMasterSessionId);
+        isMaster = true;
+        console.log(`Room created: ${normalizedRoomId} by master ${socket.id} (session: ${newMasterSessionId})`);
       } else {
-        console.log(`Document update rejected - session: ${!!session}, isMaster: ${session && session.masterId === socket.id}`);
+        // Room exists - check if this is the master reconnecting
+        if (masterSessionId && masterSessionId === room.masterSessionId) {
+          // Master is reconnecting - restore their control
+          room.masterSocketId = socket.id;
+          isMaster = true;
+          console.log(`Master reconnected to room ${normalizedRoomId} (session: ${masterSessionId})`);
+        } else {
+          // Regular client joining
+          isMaster = false;
+          console.log(`Client ${socket.id} joined room ${normalizedRoomId}`);
+        }
+      }
+
+      // Join the socket room
+      socket.join(normalizedRoomId);
+
+      if (callback) {
+        callback({
+          roomId: normalizedRoomId,
+          isMaster,
+          masterSessionId: room.masterSessionId,
+          document: room.document || '',
+          scrollPosition: room.scrollPosition,
+          scrollTopPercent: room.scrollTopPercent,
+          lineIndex: room.lineIndex || 0,
+          currentSongTitle: room.currentSongTitle || '',
+          upNextTitle: room.upNextTitle || '',
+          previousSongTitle: room.previousSongTitle || '',
+        });
       }
     });
 
-    // Master updates scroll position
-    socket.on('update-scroll', (data) => {
-      const session = sessions.get(data.sessionId);
+    // Sync scroll - Master broadcasts scroll percentage to room
+    socket.on('sync-scroll', (data) => {
+      const { roomID, scrollTopPercent, scrollPosition, lineIndex } = data;
+      const room = rooms.get(roomID);
       
-      if (session && session.masterId === socket.id) {
-        session.scrollPosition = data.scrollPosition;
-        socket.to(data.sessionId).emit('scroll-updated', {
+      if (!room) {
+        console.log(`Room ${roomID} not found for sync-scroll`);
+        return;
+      }
+
+      // Only master can sync scroll
+      if (room.masterSocketId === socket.id) {
+        room.scrollTopPercent = scrollTopPercent || 0;
+        room.scrollPosition = scrollPosition || 0;
+        if (lineIndex !== undefined) {
+          room.lineIndex = lineIndex;
+        }
+        
+        // Broadcast to all clients in the room (excluding sender)
+        socket.to(roomID).emit('scroll-synced', {
+          scrollTopPercent: room.scrollTopPercent,
+          scrollPosition: room.scrollPosition,
+          lineIndex: room.lineIndex,
+        });
+        
+        console.log(`Scroll synced in room ${roomID}: ${scrollTopPercent}%`);
+      } else {
+        console.log(`Non-master ${socket.id} attempted to sync scroll in room ${roomID}`);
+      }
+    });
+
+    // Master updates document/content (legacy support)
+    socket.on('content-change', (data) => {
+      const room = rooms.get(data.roomId);
+      
+      if (room && room.masterSocketId === socket.id) {
+        room.document = data.document || '';
+        room.currentSongTitle = data.currentSongTitle || '';
+        room.upNextTitle = data.upNextTitle || '';
+        room.previousSongTitle = data.previousSongTitle || '';
+        
+        // Broadcast to all clients in the room (excluding sender)
+        socket.to(data.roomId).emit('content-updated', {
+          document: room.document,
+          currentSongTitle: room.currentSongTitle,
+          upNextTitle: room.upNextTitle,
+          previousSongTitle: room.previousSongTitle,
+        });
+        
+        console.log(`Content updated in room ${data.roomId}`);
+      }
+    });
+
+    // Master updates scroll position (legacy support)
+    socket.on('scroll-update', (data) => {
+      const room = rooms.get(data.roomId);
+      
+      if (room && room.masterSocketId === socket.id) {
+        room.scrollPosition = data.scrollPosition;
+        
+        // Broadcast to all clients in the room
+        socket.to(data.roomId).emit('scroll-updated', {
           scrollPosition: data.scrollPosition,
         });
       }
     });
 
-    // Master updates line-based scroll position
-    socket.on('update-line-scroll', (data) => {
-      const session = sessions.get(data.sessionId);
+    // Master updates line-based scroll position (legacy support)
+    socket.on('line-scroll-update', (data) => {
+      const room = rooms.get(data.roomId);
       
-      if (session && session.masterId === socket.id) {
-        session.lineIndex = data.lineIndex;
-        socket.to(data.sessionId).emit('line-scroll-updated', {
+      if (room && room.masterSocketId === socket.id) {
+        room.lineIndex = data.lineIndex;
+        
+        // Broadcast to all clients in the room
+        socket.to(data.roomId).emit('line-scroll-updated', {
           lineIndex: data.lineIndex,
         });
       }
     });
 
-    // Master updates current song title
-    socket.on('update-current-song', (data) => {
-      const session = sessions.get(data.sessionId);
-      
-      if (session && session.masterId === socket.id) {
-        session.currentSongTitle = data.songTitle;
-        socket.to(data.sessionId).emit('current-song-updated', {
-          songTitle: data.songTitle,
-        });
-      }
-    });
-
-    // Master updates up next title
-    socket.on('update-up-next', (data) => {
-      const session = sessions.get(data.sessionId);
-      
-      if (session && session.masterId === socket.id) {
-        session.upNextTitle = data.upNextTitle;
-        socket.to(data.sessionId).emit('up-next-updated', {
-          upNextTitle: data.upNextTitle,
-        });
-      }
-    });
-
-    // Master updates previous song title
-    socket.on('update-previous-song', (data) => {
-      const session = sessions.get(data.sessionId);
-      
-      if (session && session.masterId === socket.id) {
-        session.previousSongTitle = data.previousTitle;
-        socket.to(data.sessionId).emit('previous-song-updated', {
-          previousTitle: data.previousTitle,
-        });
-      }
-    });
-
     // Handle disconnection
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
+    socket.on('disconnect', (reason) => {
+      console.log('Client disconnected:', socket.id, reason);
       
-      // Remove client from all sessions
-      for (const [sessionId, session] of sessions.entries()) {
-        if (session.clients.has(socket.id)) {
-          session.clients.delete(socket.id);
-          
-          // If master disconnected, close session
-          if (session.masterId === socket.id) {
-            io.to(sessionId).emit('session-closed');
-            sessions.delete(sessionId);
-            console.log(`Session ${sessionId} closed (master disconnected)`);
-          }
+      // Find rooms where this socket was master
+      for (const [roomId, room] of rooms.entries()) {
+        if (room.masterSocketId === socket.id) {
+          // Master disconnected - but don't delete room immediately
+          // Wait for reconnection (sticky master)
+          console.log(`Master ${socket.id} disconnected from room ${roomId}, waiting for reconnection...`);
+          // Room stays active, master can reconnect with their session ID
         }
+      }
+    });
+
+    // Handle reconnection (legacy support)
+    socket.on('reconnect-room', (roomId, masterSessionId, callback) => {
+      const normalizedRoomId = roomId.toUpperCase().trim();
+      const room = rooms.get(normalizedRoomId);
+      
+      if (room) {
+        // Check if this is the master reconnecting
+        if (masterSessionId && masterSessionId === room.masterSessionId) {
+          room.masterSocketId = socket.id;
+          console.log(`Master reconnected to room ${normalizedRoomId}`);
+        }
+        
+        socket.join(normalizedRoomId);
+        console.log(`Client ${socket.id} reconnected to room ${normalizedRoomId}`);
+        
+        if (callback) {
+          callback({
+            roomId: normalizedRoomId,
+            isMaster: room.masterSocketId === socket.id,
+            masterSessionId: room.masterSessionId,
+            document: room.document || '',
+            scrollPosition: room.scrollPosition,
+            scrollTopPercent: room.scrollTopPercent,
+            lineIndex: room.lineIndex || 0,
+            currentSongTitle: room.currentSongTitle || '',
+            upNextTitle: room.upNextTitle || '',
+            previousSongTitle: room.previousSongTitle || '',
+          });
+        }
+      } else {
+        if (callback) callback({ error: 'Room not found' });
       }
     });
   });
@@ -253,7 +272,8 @@ app.prepare().then(() => {
       console.error(err);
       process.exit(1);
     })
-    .listen(port, () => {
-      console.log(`> Ready on http://${hostname}:${port}`);
+    .listen(PORT, '0.0.0.0', () => {
+      console.log(`> Ready on http://0.0.0.0:${PORT}`);
+      console.log(`> Environment: ${dev ? 'development' : 'production'}`);
     });
 });
