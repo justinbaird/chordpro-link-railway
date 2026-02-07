@@ -122,7 +122,8 @@ app.prepare().then(() => {
 
       if (callback) {
         callback({
-          roomId: normalizedRoomId,
+          sessionId: normalizedRoomId, // Use sessionId to match client interface
+          roomId: normalizedRoomId, // Keep roomId for backward compatibility
           isMaster,
           masterSessionId: room.masterSessionId,
           document: room.document || '',
@@ -249,7 +250,8 @@ app.prepare().then(() => {
         
         if (callback) {
           callback({
-            roomId: normalizedRoomId,
+            sessionId: normalizedRoomId, // Use sessionId to match client interface
+            roomId: normalizedRoomId, // Keep roomId for backward compatibility
             isMaster: room.masterSocketId === socket.id,
             masterSessionId: room.masterSessionId,
             document: room.document || '',
