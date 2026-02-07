@@ -1,0 +1,204 @@
+.container {
+  width: 100%;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: auto; /* Allow horizontal scroll for long lines */
+  background: #ffffff;
+  padding: 2rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  line-height: 1.6;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.container.dark {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+.content {
+  max-width: 800px;
+  margin: 0 auto;
+  min-height: 100%;
+  padding-bottom: 50vh; /* Allow scrolling past content */
+}
+
+.bottomSpacer {
+  height: 50vh; /* Extra space at bottom for centering content */
+}
+
+.title {
+  font-size: calc(2.5rem * var(--text-size, 1));
+  font-weight: bold;
+  text-align: center;
+  margin: 2rem 0 1rem 0;
+  color: #1a1a1a;
+  transition: color 0.3s ease;
+}
+
+.container.dark .title {
+  color: #ffffff;
+}
+
+.subtitle {
+  font-size: calc(1.5rem * var(--text-size, 1));
+  text-align: center;
+  margin: 0 0 2rem 0;
+  color: #666;
+  font-weight: normal;
+  transition: color 0.3s ease;
+}
+
+.container.dark .subtitle {
+  color: #b0b0b0;
+}
+
+.emptyLine {
+  height: 1rem;
+}
+
+.comment {
+  color: #999;
+  font-style: italic;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  transition: color 0.3s ease;
+}
+
+.container.dark .comment {
+  color: #777;
+}
+
+.commentDirective {
+  margin: 2rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.commentLine {
+  width: 100%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease;
+}
+
+.container.dark .commentLine {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.commentText {
+  color: white;
+  font-size: calc(1.5rem * var(--text-size, 1));
+  font-weight: bold;
+  text-align: center;
+  padding: calc(0.75rem * var(--text-size, 1)) calc(1.5rem * var(--text-size, 1));
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  transition: all 0.3s ease;
+  display: inline-block;
+  width: auto;
+}
+
+.container.dark .commentText {
+  color: white;
+  background: rgba(0, 0, 0, 0.8);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 1);
+}
+
+/* Comment text scales with text size, no responsive reduction */
+
+.sectionMarker {
+  margin: 2rem 0 1rem 0;
+  text-align: center;
+}
+
+.sectionLabel {
+  display: inline-block;
+  padding: 0.5rem 1.5rem;
+  background: #f0f0f0;
+  border-radius: 4px;
+  font-weight: 600;
+  color: #555;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.container.dark .sectionLabel {
+  background: #333;
+  color: #ccc;
+}
+
+.sectionEnd {
+  height: 1.5rem;
+}
+
+.lyricsLine {
+  margin: 1rem 0;
+  min-height: 3rem;
+}
+
+.lineContainer {
+  position: relative;
+  margin: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  font-size: calc(var(--lyrics-size, 1.2rem)); /* Set base font size for em calculations */
+}
+
+.chordLine {
+  height: calc(var(--chord-line-height, 1.5rem));
+  line-height: calc(var(--chord-line-height, 1.5rem));
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow-x: visible;
+  overflow-y: visible;
+  position: relative;
+  font-size: calc(var(--lyrics-size, 1.2rem)); /* Match lyrics font size for em calculations */
+  min-width: min-content;
+}
+
+.chord {
+  color: #0066cc;
+  font-weight: 600;
+  font-size: calc(var(--chord-size, 0.9rem));
+  display: inline-block;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+  position: relative;
+  vertical-align: top;
+}
+
+.container.dark .chord {
+  color: #4da6ff;
+}
+
+.lyricsText {
+  font-size: calc(var(--lyrics-size, 1.2rem));
+  line-height: calc(var(--lyrics-line-height, 1.8));
+  color: #1a1a1a;
+  transition: color 0.3s ease;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  /* Prevent awkward wrapping - prefer to scroll horizontally on narrow screens */
+  min-width: min-content;
+}
+
+.container.dark .lyricsText {
+  color: #e0e0e0;
+}
+
+/* Responsive design - only adjust padding, keep text sizes consistent */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+}

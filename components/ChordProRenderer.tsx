@@ -1,0 +1,267 @@
+import React from 'react';
+import { ChordProDocument, ChordProLine } from '@/lib/chordpro-parser';
+import { Theme } from '@/lib/useTheme';
+import styles from './ChordProRenderer.module.css';
+
+interface ChordProRendererProps {
+  document: ChordProDocument;
+  scrollPosition?: number;
+  onScroll?: (position: number) => void;
+  onLineScroll?: (lineIndex: number) => void; // New: send line index instead of pixel position
+  isMaster?: boolean;
+  theme?: Theme;
+  textSize?: number;
+  targetLineIndex?: number; // New: line index to scroll to (for clients)
+}
+
+export default function ChordProRenderer({
+  document,
+  scrollPosition,
+  onScroll,
+  onLineScroll,
+  isMaster = false,
+  theme = 'light',
+  textSize = 1.0,
+  targetLineIndex,
+}: ChordProRendererProps) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const previousDocumentRef = React.useRef<ChordProDocument | null>(null);
+  const lineRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // Scroll to top only when document changes (new file loaded)
+  React.useEffect(() => {
+    // Check if document actually changed
+    if (previousDocumentRef.current !== document) {
+      previousDocumentRef.current = document;
+      
+      // Clear line refs when document changes
+      lineRefs.current.clear();
+      
+      // Only scroll to top if this is a new document
+      if (containerRef.current) {
+        containerRef.current.scrollTop = 0;
+        if (onScroll && isMaster) {
+          onScroll(0);
+        }
+        if (onLineScroll && isMaster) {
+          onLineScroll(0);
+        }
+      }
+    }
+  }, [document, isMaster, onScroll, onLineScroll]);
+
+  // Sync scroll position when it changes (for clients) - use line-based sync when available
+  React.useEffect(() => {
+    if (!isMaster && containerRef.current) {
+      // Only update scroll if document hasn't changed (to avoid interfering with document change scroll)
+      if (previousDocumentRef.current === document) {
+        // Use line-based sync if available (better for different text sizes)
+        if (targetLineIndex !== undefined && lineRefs.current.has(targetLineIndex)) {
+          const targetLineElement = lineRefs.current.get(targetLineIndex);
+          if (targetLineElement) {
+            // Scroll the target line to the top
+            containerRef.current.scrollTop = targetLineElement.offsetTop;
+            return;
+          }
+        }
+        
+        // Fallback to pixel-based sync
+        if (scrollPosition !== undefined) {
+          containerRef.current.scrollTop = scrollPosition;
+        }
+      }
+    }
+  }, [targetLineIndex, scrollPosition, isMaster, document]);
+
+  // Track scroll for master
+  const handleScroll = React.useCallback(() => {
+    if (isMaster && containerRef.current) {
+      const scrollTop = containerRef.current.scrollTop;
+      
+      // Send pixel position (primary sync method)
+      if (onScroll) {
+        onScroll(scrollTop);
+      }
+      
+      // Also calculate and send line index for better sync across text sizes
+      if (onLineScroll && lineRefs.current.size > 0) {
+        let topLineIndex = 0;
+        let minDistance = Infinity;
+        
+        lineRefs.current.forEach((element, index) => {
+          if (element) {
+            const elementTop = element.offsetTop;
+            const distance = Math.abs(scrollTop - elementTop);
+            
+            // Find the line closest to the scroll position
+            if (distance < minDistance) {
+              minDistance = distance;
+              topLineIndex = index;
+            }
+          }
+        });
+        
+        onLineScroll(topLineIndex);
+      }
+    }
+  }, [isMaster, onScroll, onLineScroll]);
+
+  const setLineRef = React.useCallback((index: number, element: HTMLDivElement | null) => {
+    if (element) {
+      lineRefs.current.set(index, element);
+    } else {
+      lineRefs.current.delete(index);
+    }
+  }, []);
+
+  const renderLine = (line: ChordProLine, index: number) => {
+    const lineRef = (el: HTMLDivElement | null) => setLineRef(index, el);
+    
+    switch (line.type) {
+      case 'empty':
+        return <div key={index} ref={lineRef} className={styles.emptyLine} />;
+
+      case 'comment':
+        return (
+          <div key={index} ref={setLineRef.bind(null, index)} className={styles.comment}>
+            #{line.content}
+          </div>
+        );
+
+      case 'directive':
+        if (line.directive === 'title' && line.value) {
+          return (
+            <h1 key={index} ref={setLineRef.bind(null, index)} className={styles.title}>
+              {line.value}
+            </h1>
+          );
+        }
+        if (line.directive === 'subtitle' && line.value) {
+          return (
+            <h2 key={index} ref={setLineRef.bind(null, index)} className={styles.subtitle}>
+              {line.value}
+            </h2>
+          );
+        }
+        if (line.directive === 'start_of_chorus') {
+          return (
+            <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionMarker}>
+              <span className={styles.sectionLabel}>Chorus</span>
+            </div>
+          );
+        }
+        if (line.directive === 'end_of_chorus') {
+          return <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionEnd} />;
+        }
+        if (line.directive === 'start_of_verse') {
+          return (
+            <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionMarker}>
+              <span className={styles.sectionLabel}>Verse</span>
+            </div>
+          );
+        }
+        if (line.directive === 'end_of_verse') {
+          return <div key={index} ref={setLineRef.bind(null, index)} className={styles.sectionEnd} />;
+        }
+        if (line.directive === 'comment' && line.value) {
+          return (
+            <div key={index} ref={setLineRef.bind(null, index)} className={styles.commentDirective}>
+              <div className={styles.commentLine} />
+              <div className={styles.commentText}>{line.value}</div>
+              <div className={styles.commentLine} />
+            </div>
+          );
+        }
+        return null;
+
+      case 'lyrics':
+        return (
+          <div key={index} ref={setLineRef.bind(null, index)} className={styles.lyricsLine}>
+            {renderLyricsWithChords(line.lyrics || '', line.chords || [])}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const renderLyricsWithChords = (
+    lyrics: string,
+    chords: Array<{ chord: string; position: number }>
+  ) => {
+    if (chords.length === 0) {
+      return <div className={styles.lyricsText}>{lyrics}</div>;
+    }
+
+    // Sort chords by position
+    const sortedChords = [...chords].sort((a, b) => a.position - b.position);
+    
+    // Calculate character width - use em units relative to lyrics font size
+    // The key is that both chords and lyrics need to use the same base for em calculations
+    // Since lyrics font size is 1.2rem * textSize, and we want chords aligned above,
+    // we need to calculate based on the lyrics font size
+    const lyricsFontSizeEm = 1.2 * textSize; // This is the base for em calculations
+    const charWidthEm = 0.6; // Character width multiplier (relative to lyrics font size)
+    
+    return (
+      <div className={styles.lineContainer}>
+        <div className={styles.chordLine}>
+          {sortedChords.map((chordData, index) => {
+            const prevPosition = index === 0 ? 0 : sortedChords[index - 1].position;
+            const spacing = chordData.position - prevPosition;
+            
+            // Calculate position in em units relative to lyrics font size
+            const positionEm = index === 0 
+              ? chordData.position * charWidthEm
+              : spacing * charWidthEm;
+            
+            return (
+              <span
+                key={`chord-display-${index}`}
+                className={styles.chord}
+                style={{
+                  marginLeft: `${positionEm}em`,
+                }}
+              >
+                {chordData.chord}
+              </span>
+            );
+          })}
+        </div>
+        <div className={styles.lyricsText}>
+          {lyrics}
+        </div>
+      </div>
+    );
+  };
+
+  // Calculate CSS variables for text size
+  // Use consistent base sizes that scale together - these are the same for master and client
+  const baseChordSize = 0.9; // rem
+  const baseLyricsSize = 1.2; // rem
+  const baseChordLineHeight = 1.5; // rem
+  const baseLyricsLineHeight = 1.8; // multiplier
+  
+  const textSizeStyle = {
+    '--text-size': textSize.toString(),
+    '--chord-size': `${baseChordSize * textSize}rem`,
+    '--lyrics-size': `${baseLyricsSize * textSize}rem`,
+    '--chord-line-height': `${baseChordLineHeight * textSize}rem`,
+    '--lyrics-line-height': `${baseLyricsLineHeight * textSize}`,
+  } as React.CSSProperties;
+
+  return (
+    <div
+      ref={containerRef}
+      className={`${styles.container} ${theme === 'dark' ? styles.dark : ''}`}
+      onScroll={handleScroll}
+      style={textSizeStyle}
+    >
+      <div className={styles.content}>
+        {document.lines.map((line, index) => renderLine(line, index))}
+        <div className={styles.bottomSpacer} />
+      </div>
+    </div>
+  );
+}

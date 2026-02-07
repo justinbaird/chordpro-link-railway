@@ -1,0 +1,823 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f5f5f5;
+  transition: background-color 0.3s ease;
+}
+
+.container.dark {
+  background: #1a1a1a;
+}
+
+.mainContent {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.header {
+  background: #1a1a1a;
+  border-bottom: 1px solid #404040;
+  padding: 1rem 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  min-height: fit-content;
+}
+
+.container.dark .header {
+  background: #1a1a1a;
+  border-bottom-color: #404040;
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 100%;
+  position: relative;
+  padding-right: 3.5rem; /* Space for hamburger menu */
+}
+
+.headerLeft {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  max-width: 30%;
+  overflow: hidden;
+}
+
+.headerCenter {
+  flex: 1 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+}
+
+.headerRight {
+  flex: 0 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 30%;
+  padding-right: 0.5rem; /* Extra padding to prevent overlap */
+  overflow: hidden;
+}
+
+.headerActions {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.nowPlaying {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.playingNowLabel {
+  opacity: 0.9;
+  font-weight: 600;
+}
+
+.previousSongButton {
+  background: none;
+  border: none;
+  color: #e65100;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.container.dark .previousSongButton {
+  color: #ff9800;
+}
+
+.previousSongButton:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.previousLabel {
+  opacity: 0.8;
+  font-weight: 500;
+}
+
+.nextSongButton {
+  background: none;
+  border: none;
+  color: #2e7d32;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.container.dark .nextSongButton {
+  color: #81c784;
+}
+
+.nextSongButton:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.nextLabel {
+  opacity: 0.8;
+  font-weight: 500;
+}
+
+.startLabel,
+.endLabel {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #999;
+  padding: 0.5rem 1rem;
+  white-space: nowrap;
+}
+
+.container.dark .startLabel,
+.container.dark .endLabel {
+  color: #666;
+}
+
+.songTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #f0f0f0;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+  flex-shrink: 0;
+  height: fit-content;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.container.dark .songTitle {
+  background: #333;
+}
+
+.songTitleLabel {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 600;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+.container.dark .songTitleLabel {
+  color: #b0b0b0;
+}
+
+.songTitleValue {
+  font-size: 0.85rem;
+  color: #333;
+  font-weight: 600;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+.container.dark .songTitleValue {
+  color: #e0e0e0;
+}
+
+.upNext {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #e8f5e9;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+  flex-shrink: 0;
+  height: fit-content;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.container.dark .upNext {
+  background: #1a3a1a;
+}
+
+.upNextLabel {
+  font-size: 0.75rem;
+  color: #2e7d32;
+  font-weight: 600;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+.container.dark .upNextLabel {
+  color: #81c784;
+}
+
+.upNextButton {
+  font-size: 0.85rem;
+  color: #2e7d32;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
+.container.dark .upNextButton {
+  color: #81c784;
+}
+
+.upNextButton:hover {
+  color: #1b5e20;
+}
+
+.container.dark .upNextButton:hover {
+  color: #a5d6a7;
+}
+
+.previousSong {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #fff3e0;
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
+}
+
+.container.dark .previousSong {
+  background: #3a2a1a;
+}
+
+.previousSongLabel {
+  font-size: 0.85rem;
+  color: #e65100;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.container.dark .previousSongLabel {
+  color: #ff9800;
+}
+
+.previousSongButton {
+  font-size: 1rem;
+  color: #e65100;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.3s ease;
+}
+
+.container.dark .previousSongButton {
+  color: #ff9800;
+}
+
+.previousSongButton:hover {
+  color: #bf360c;
+}
+
+.container.dark .previousSongButton:hover {
+  color: #ffb74d;
+}
+
+.menuTitle {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  color: #333;
+}
+
+.container.dark .menuTitle {
+  color: #e0e0e0;
+}
+
+.menuItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.menuLabel {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.container.dark .menuLabel {
+  color: #b0b0b0;
+}
+
+.menuValue {
+  font-size: 1rem;
+  color: #333;
+}
+
+.container.dark .menuValue {
+  color: #e0e0e0;
+}
+
+.menuSessionId {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sessionId {
+  font-weight: 600;
+  color: #667eea;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  transition: color 0.3s ease;
+  text-transform: lowercase;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.container.dark .sessionId {
+  color: #7c8fff;
+}
+
+.menuDivider {
+  height: 1px;
+  background: #e0e0e0;
+  margin: 0.5rem 0;
+}
+
+.container.dark .menuDivider {
+  background: #404040;
+}
+
+.menuButton {
+  width: 100%;
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.menuButton:hover {
+  background: #5568d3;
+}
+
+.container.dark .menuButton {
+  background: #667eea;
+}
+
+.container.dark .menuButton:hover {
+  background: #5568d3;
+}
+
+.menuButtonSecondary {
+  width: 100%;
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.menuButtonSecondary:hover {
+  background: #d0d0d0;
+}
+
+.container.dark .menuButtonSecondary {
+  background: #404040;
+  color: #e0e0e0;
+}
+
+.container.dark .menuButtonSecondary:hover {
+  background: #505050;
+}
+
+.menuInput {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+  color: #333;
+  transition: border-color 0.3s ease;
+  font-family: inherit;
+  text-transform: lowercase;
+}
+
+.menuInput:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.container.dark .menuInput {
+  background: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+.container.dark .menuInput:focus {
+  border-color: #7c8fff;
+}
+
+.errorLabel {
+  color: #f44336 !important;
+}
+
+.container.dark .errorLabel {
+  color: #ff6b6b !important;
+}
+
+.container.dark .sessionId {
+  color: #7c8fff;
+}
+
+.copyButton {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.copyButton:hover {
+  background: #5568d3;
+}
+
+.editButton {
+  background: #4caf50;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.editButton:hover {
+  background: #45a049;
+}
+
+.connected {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.disconnected {
+  color: #f44336;
+  font-weight: 600;
+}
+
+.button {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.button:hover {
+  background: #5568d3;
+}
+
+.buttonSecondary {
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.buttonSecondary:hover {
+  background: #d0d0d0;
+}
+
+.container.dark .buttonSecondary {
+  background: #404040;
+  color: #e0e0e0;
+}
+
+.container.dark .buttonSecondary:hover {
+  background: #505050;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  transition: color 0.3s ease;
+}
+
+.container.dark .emptyState {
+  color: #b0b0b0;
+}
+
+.emptyState p {
+  font-size: 1.2rem;
+  margin: 0.5rem 0;
+}
+
+.emptyStateHint {
+  font-size: 0.9rem;
+  color: #999;
+  transition: color 0.3s ease;
+}
+
+.container.dark .emptyStateHint {
+  color: #777;
+}
+
+@media (max-width: 1024px) {
+  .header {
+    padding: 0.75rem 1rem;
+  }
+
+  .nowPlaying {
+    font-size: 1.3rem;
+  }
+
+  .previousSongButton,
+  .nextSongButton {
+    font-size: 1rem;
+  }
+
+  .startLabel,
+  .endLabel {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .headerContent {
+    gap: 0.5rem;
+  }
+
+  .nowPlaying {
+    font-size: 1.1rem;
+  }
+
+  .previousSongButton,
+  .nextSongButton {
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .startLabel,
+  .endLabel {
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .headerActions {
+    right: 0.5rem;
+  }
+}
+
+/* Setlist styles within hamburger menu */
+.setlistSection {
+  margin-top: 0.5rem;
+}
+
+.setlistTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  transition: color 0.3s ease;
+}
+
+.container.dark .setlistTitle {
+  color: #e0e0e0;
+}
+
+.setlistEmpty {
+  padding: 1rem 0;
+  text-align: center;
+  color: #666;
+  transition: color 0.3s ease;
+}
+
+.container.dark .setlistEmpty {
+  color: #b0b0b0;
+}
+
+.setlistEmpty p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.setlistHint {
+  font-size: 0.8rem;
+  color: #999;
+  transition: color 0.3s ease;
+}
+
+.container.dark .setlistHint {
+  color: #777;
+}
+
+.setlistList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.setlistItem {
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: move;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+  background: white;
+}
+
+.container.dark .setlistItem {
+  background: #333;
+  border-color: #404040;
+}
+
+.setlistItem:hover {
+  background: #f5f5f5;
+  border-color: #667eea;
+}
+
+.container.dark .setlistItem:hover {
+  background: #3a3a3a;
+  border-color: #7c8fff;
+}
+
+.setlistItemActive {
+  background: #e8edff;
+  border-color: #667eea;
+  font-weight: 600;
+}
+
+.container.dark .setlistItemActive {
+  background: #2a2a4a;
+  border-color: #7c8fff;
+}
+
+.setlistItemDragging {
+  opacity: 0.5;
+}
+
+.setlistItemDragOver {
+  border-color: #667eea;
+  border-style: dashed;
+  transform: translateY(-2px);
+}
+
+.setlistItemContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.setlistItemTitle {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  transition: color 0.3s ease;
+}
+
+.container.dark .setlistItemTitle {
+  color: #e0e0e0;
+}
+
+.setlistItemActive .setlistItemTitle {
+  color: #667eea;
+}
+
+.container.dark .setlistItemActive .setlistItemTitle {
+  color: #7c8fff;
+}
+
+.setlistItemFilename {
+  font-size: 0.75rem;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.container.dark .setlistItemFilename {
+  color: #999;
+}
+
+.setlistDeleteButton {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #999;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+.container.dark .setlistDeleteButton {
+  color: #777;
+}
+
+.setlistDeleteButton:hover {
+  color: #f44336;
+}
