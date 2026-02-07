@@ -254,11 +254,25 @@ export default function MasterView() {
       setStoredTranspose(sessionId, currentSongId, newTranspose);
       // Sync transpose to clients with document refresh to force re-render
       if (socketClient && sessionId && document) {
+        // Get current scroll position before updating
+        const currentScrollTop = containerRef.current?.scrollTop || 0;
+        const scrollHeight = containerRef.current?.scrollHeight || 0;
+        const clientHeight = containerRef.current?.clientHeight || 0;
+        const maxScroll = scrollHeight - clientHeight;
+        const scrollTopPercent = maxScroll > 0 ? (currentScrollTop / maxScroll) * 100 : 0;
+        
         socketClient.updateContent({ 
           document: document,
           transpose: newTranspose,
           currentSongTitle: currentSongTitle,
         });
+        
+        // Preserve scroll position after content update
+        setTimeout(() => {
+          if (containerRef.current && sessionId) {
+            socketClient.syncScroll(sessionId, scrollTopPercent, currentScrollTop, undefined);
+          }
+        }, 100);
       }
     }
   };
@@ -271,11 +285,25 @@ export default function MasterView() {
       setStoredTranspose(sessionId, currentSongId, newTranspose);
       // Sync transpose to clients with document refresh to force re-render
       if (socketClient && sessionId && document) {
+        // Get current scroll position before updating
+        const currentScrollTop = containerRef.current?.scrollTop || 0;
+        const scrollHeight = containerRef.current?.scrollHeight || 0;
+        const clientHeight = containerRef.current?.clientHeight || 0;
+        const maxScroll = scrollHeight - clientHeight;
+        const scrollTopPercent = maxScroll > 0 ? (currentScrollTop / maxScroll) * 100 : 0;
+        
         socketClient.updateContent({ 
           document: document,
           transpose: newTranspose,
           currentSongTitle: currentSongTitle,
         });
+        
+        // Preserve scroll position after content update
+        setTimeout(() => {
+          if (containerRef.current && sessionId) {
+            socketClient.syncScroll(sessionId, scrollTopPercent, currentScrollTop, undefined);
+          }
+        }, 100);
       }
     }
   };
@@ -287,11 +315,25 @@ export default function MasterView() {
       setStoredTranspose(sessionId, currentSongId, 0);
       // Sync transpose to clients with document refresh to force re-render
       if (socketClient && sessionId && document) {
+        // Get current scroll position before updating
+        const currentScrollTop = containerRef.current?.scrollTop || 0;
+        const scrollHeight = containerRef.current?.scrollHeight || 0;
+        const clientHeight = containerRef.current?.clientHeight || 0;
+        const maxScroll = scrollHeight - clientHeight;
+        const scrollTopPercent = maxScroll > 0 ? (currentScrollTop / maxScroll) * 100 : 0;
+        
         socketClient.updateContent({ 
           document: document,
           transpose: 0,
           currentSongTitle: currentSongTitle,
         });
+        
+        // Preserve scroll position after content update
+        setTimeout(() => {
+          if (containerRef.current && sessionId) {
+            socketClient.syncScroll(sessionId, scrollTopPercent, currentScrollTop, undefined);
+          }
+        }, 100);
       }
     }
   };
@@ -303,11 +345,25 @@ export default function MasterView() {
       setStoredTranspose(sessionId, currentSongId, semitones);
       // Sync transpose to clients with document refresh to force re-render
       if (socketClient && sessionId && document) {
+        // Get current scroll position before updating
+        const currentScrollTop = containerRef.current?.scrollTop || 0;
+        const scrollHeight = containerRef.current?.scrollHeight || 0;
+        const clientHeight = containerRef.current?.clientHeight || 0;
+        const maxScroll = scrollHeight - clientHeight;
+        const scrollTopPercent = maxScroll > 0 ? (currentScrollTop / maxScroll) * 100 : 0;
+        
         socketClient.updateContent({ 
           document: document,
           transpose: semitones,
           currentSongTitle: currentSongTitle,
         });
+        
+        // Preserve scroll position after content update
+        setTimeout(() => {
+          if (containerRef.current && sessionId) {
+            socketClient.syncScroll(sessionId, scrollTopPercent, currentScrollTop, undefined);
+          }
+        }, 100);
       }
     }
   };
