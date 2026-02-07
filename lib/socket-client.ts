@@ -304,7 +304,7 @@ export class SocketClient {
   }
 
   updatePreviousSong(previousTitle: string): void {
-    this.updateContent({ previousSongTitle });
+    this.updateContent({ previousSongTitle: previousTitle });
   }
 
   onCurrentSongUpdate(callback: (songTitle: string) => void): void {
