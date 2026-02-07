@@ -66,12 +66,27 @@ export default function ChordProRenderer({
     if (!isMaster && containerRef.current) {
       console.log('Scroll sync effect triggered:', { scrollTopPercent, scrollPosition, targetLineIndex, isMaster });
       console.log('Container element:', containerRef.current);
+      console.log('Container data-master attribute:', containerRef.current?.getAttribute('data-master'));
+      console.log('Container computed styles:', containerRef.current ? window.getComputedStyle(containerRef.current) : null);
       console.log('Container dimensions:', {
         scrollHeight: containerRef.current.scrollHeight,
         clientHeight: containerRef.current.clientHeight,
         scrollTop: containerRef.current.scrollTop,
         offsetHeight: containerRef.current.offsetHeight,
+        offsetTop: containerRef.current.offsetTop,
       });
+      // Check parent dimensions
+      if (containerRef.current?.parentElement) {
+        const parent = containerRef.current.parentElement;
+        console.log('Parent element:', parent);
+        console.log('Parent dimensions:', {
+          scrollHeight: parent.scrollHeight,
+          clientHeight: parent.clientHeight,
+          offsetHeight: parent.offsetHeight,
+          computedHeight: window.getComputedStyle(parent).height,
+          computedOverflow: window.getComputedStyle(parent).overflow,
+        });
+      }
       
       // Use requestAnimationFrame to ensure DOM is ready
       const applyScroll = () => {
