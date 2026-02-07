@@ -16,6 +16,7 @@ export interface ChordProDocument {
   title?: string;
   lines: ChordProLine[];
   metadata: Record<string, string>;
+  transpose?: number; // Transpose value from {transpose: value} directive
 }
 
 /**
@@ -68,6 +69,14 @@ export function parseChordPro(content: string): ChordProDocument {
         
         if (fullDirective === 'title') {
           document.title = value;
+        }
+        
+        // Handle transpose directive
+        if (fullDirective === 'transpose') {
+          const transposeValue = parseInt(value, 10);
+          if (!isNaN(transposeValue)) {
+            document.transpose = transposeValue;
+          }
         }
         
         document.metadata[fullDirective] = value;

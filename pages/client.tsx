@@ -8,6 +8,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import TextSizeControls from '@/components/TextSizeControls';
 import { getStoredTextSize, setStoredTextSize } from '@/lib/textSizeStorage';
+import { transposeDocument } from '@/lib/chordTransposer';
 import styles from '../styles/Client.module.css';
 
 const ChordProRenderer = dynamic(
@@ -31,6 +32,7 @@ export default function ClientView() {
   const [upNextTitle, setUpNextTitle] = useState<string>('');
   const [previousSongTitle, setPreviousSongTitle] = useState<string>('');
   const [textSize, setTextSize] = useState<number>(getStoredTextSize());
+  const [transpose, setTranspose] = useState<number>(0);
 
   useEffect(() => {
     if (!sessionIdParam || typeof sessionIdParam !== 'string') {
@@ -90,6 +92,10 @@ export default function ClientView() {
         if (sessionInfo.previousSongTitle) {
           setPreviousSongTitle(sessionInfo.previousSongTitle);
         }
+        
+        if (sessionInfo.transpose !== undefined) {
+          setTranspose(sessionInfo.transpose);
+        }
       }).catch((err) => {
         console.error('Failed to join session:', err);
         setError(err.message || 'Failed to join session');
@@ -131,6 +137,27 @@ export default function ClientView() {
     // Listen for previous song updates
     client.onPreviousSongUpdate((previous) => {
       setPreviousSongTitle(previous);
+    });
+
+    // Listen for content updates (including transpose)
+    client.onContentUpdate((data) => {
+      if (data.transpose !== undefined) {
+        setTranspose(data.transpose);
+      }
+      if (data.document !== undefined) {
+        setDocument(data.document);
+        const parsed = parseChordPro(data.document);
+        setParsedDocument(parsed);
+      }
+      if (data.currentSongTitle !== undefined) {
+        setCurrentSongTitle(data.currentSongTitle);
+      }
+      if (data.upNextTitle !== undefined) {
+        setUpNextTitle(data.upNextTitle);
+      }
+      if (data.previousSongTitle !== undefined) {
+        setPreviousSongTitle(data.previousSongTitle);
+      }
     });
 
     // Listen for session closure
@@ -260,7 +287,7 @@ export default function ClientView() {
         {parsedDocument ? (
           <ChordProRenderer
             key={currentSongTitle || 'default'}
-            document={parsedDocument}
+            document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
             scrollPosition={scrollPosition}
             targetLineIndex={targetLineIndex}
             isMaster={false}

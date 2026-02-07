@@ -42,6 +42,7 @@ function createRoom(masterSocketId, roomId, masterSessionId = null) {
     currentSongTitle: '',
     upNextTitle: '',
     previousSongTitle: '',
+    transpose: 0, // Transpose value in semitones
     createdAt: Date.now(),
   };
 }
@@ -133,6 +134,7 @@ app.prepare().then(() => {
           currentSongTitle: room.currentSongTitle || '',
           upNextTitle: room.upNextTitle || '',
           previousSongTitle: room.previousSongTitle || '',
+          transpose: room.transpose || 0,
         });
       }
     });
@@ -177,6 +179,9 @@ app.prepare().then(() => {
         room.currentSongTitle = data.currentSongTitle || '';
         room.upNextTitle = data.upNextTitle || '';
         room.previousSongTitle = data.previousSongTitle || '';
+        if (data.transpose !== undefined) {
+          room.transpose = data.transpose;
+        }
         
         // Broadcast to all clients in the room (excluding sender)
         socket.to(data.roomId).emit('content-updated', {
@@ -184,6 +189,7 @@ app.prepare().then(() => {
           currentSongTitle: room.currentSongTitle,
           upNextTitle: room.upNextTitle,
           previousSongTitle: room.previousSongTitle,
+          transpose: room.transpose || 0,
         });
         
         console.log(`Content updated in room ${data.roomId}`);
@@ -261,6 +267,7 @@ app.prepare().then(() => {
             currentSongTitle: room.currentSongTitle || '',
             upNextTitle: room.upNextTitle || '',
             previousSongTitle: room.previousSongTitle || '',
+            transpose: room.transpose || 0,
           });
         }
       } else {

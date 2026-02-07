@@ -1,0 +1,138 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #f0f0f0;
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
+}
+
+.controls.dark {
+  background: #333;
+}
+
+.button {
+  background: white;
+  border: 1px solid #e0e0e0;
+  color: #333;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+  min-width: 2.5rem;
+  line-height: 1;
+}
+
+.controls.dark .button {
+  background: #404040;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+.button:hover:not(:disabled) {
+  background: #e0e0e0;
+  border-color: #ccc;
+}
+
+.controls.dark .button:hover:not(:disabled) {
+  background: #505050;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  min-width: 8rem;
+  justify-content: center;
+}
+
+.keyLabel {
+  font-weight: 600;
+  color: #666;
+}
+
+.controls.dark .keyLabel {
+  color: #aaa;
+}
+
+.keyValue {
+  font-weight: 700;
+  color: #333;
+  font-size: 1rem;
+}
+
+.controls.dark .keyValue {
+  color: #e0e0e0;
+}
+
+.semitones {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.controls.dark .semitones {
+  color: #aaa;
+}
+
+.originalKey {
+  font-weight: 600;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.controls.dark .originalKey {
+  color: #aaa;
+}
+
+.resetButton {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  margin-left: 0.5rem;
+}
+
+.resetButton:hover {
+  background: #5568d3;
+}
+
+.keySelect {
+  background: white;
+  border: 1px solid #e0e0e0;
+  color: #333;
+  padding: 0.4rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-left: 0.5rem;
+  min-width: 8rem;
+}
+
+.controls.dark .keySelect {
+  background: #404040;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+.keySelect:hover {
+  border-color: #ccc;
+}
+
+.controls.dark .keySelect:hover {
+  border-color: #666;
+}

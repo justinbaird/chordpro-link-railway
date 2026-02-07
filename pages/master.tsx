@@ -8,11 +8,14 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { SetlistItem } from '@/components/SetlistSidebar';
 import HamburgerMenu from '@/components/HamburgerMenu';
 import TextSizeControls from '@/components/TextSizeControls';
+import TransposeControls from '@/components/TransposeControls';
 import { getStoredSessionId, setStoredSessionId, clearStoredSessionId, getStoredCurrentSongId, setStoredCurrentSongId, getCustomSessionName, setCustomSessionName as saveCustomSessionName, getStoredMasterSessionId, setStoredMasterSessionId } from '@/lib/sessionStorage';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import { getStoredSetlist, setStoredSetlist, clearStoredSetlist } from '@/lib/setlistStorage';
 import { storeFile, getFile, getFilesBySession, deleteFile, migrateFilesToNewSession } from '@/lib/fileStorage';
 import { getStoredTextSize, setStoredTextSize } from '@/lib/textSizeStorage';
+import { getStoredTranspose, setStoredTranspose } from '@/lib/transposeStorage';
+import { transposeDocument } from '@/lib/chordTransposer';
 import styles from '../styles/Master.module.css';
 
 const ChordProRenderer = dynamic(
@@ -38,6 +41,7 @@ export default function MasterView() {
   const [customSessionIdInput, setCustomSessionIdInput] = useState<string>('');
   const [showSessionIdInput, setShowSessionIdInput] = useState<boolean>(false);
   const [textSize, setTextSize] = useState<number>(getStoredTextSize());
+  const [transpose, setTranspose] = useState<number>(0);
   const [editingSessionId, setEditingSessionId] = useState<boolean>(false);
   const [sessionIdEditValue, setSessionIdEditValue] = useState<string>('');
   const [customSessionName, setCustomSessionName] = useState<string>('');
@@ -107,6 +111,11 @@ export default function MasterView() {
       
       setSocketClient(client);
       setSessionIdEditValue(finalSessionId); // Initialize edit value
+      
+      // Load transpose preference for this session
+      // Check if document has transpose directive first, otherwise use stored preference
+      const storedTranspose = getStoredTranspose(finalSessionId);
+      setTranspose(storedTranspose);
       
       // Load setlist metadata for this session
       const storedSetlistMetadata = getStoredSetlist(finalSessionId);
@@ -240,6 +249,52 @@ export default function MasterView() {
   const handleTextSizeReset = () => {
     setTextSize(1.0);
     setStoredTextSize(1.0);
+  };
+
+  const handleTransposeIncrease = () => {
+    const newTranspose = Math.min(11, transpose + 1);
+    setTranspose(newTranspose);
+    if (sessionId) {
+      setStoredTranspose(sessionId, newTranspose);
+      // Sync transpose to clients
+      if (socketClient && sessionId) {
+        socketClient.updateContent({ transpose: newTranspose });
+      }
+    }
+  };
+
+  const handleTransposeDecrease = () => {
+    const newTranspose = Math.max(-11, transpose - 1);
+    setTranspose(newTranspose);
+    if (sessionId) {
+      setStoredTranspose(sessionId, newTranspose);
+      // Sync transpose to clients
+      if (socketClient && sessionId) {
+        socketClient.updateContent({ transpose: newTranspose });
+      }
+    }
+  };
+
+  const handleTransposeReset = () => {
+    setTranspose(0);
+    if (sessionId) {
+      setStoredTranspose(sessionId, 0);
+      // Sync transpose to clients
+      if (socketClient && sessionId) {
+        socketClient.updateContent({ transpose: 0 });
+      }
+    }
+  };
+
+  const handleTransposeSetValue = (semitones: number) => {
+    setTranspose(semitones);
+    if (sessionId) {
+      setStoredTranspose(sessionId, semitones);
+      // Sync transpose to clients
+      if (socketClient && sessionId) {
+        socketClient.updateContent({ transpose: semitones });
+      }
+    }
   };
 
   const handleCreateCustomSession = () => {
@@ -384,6 +439,18 @@ export default function MasterView() {
     setDocument(item.content);
     const parsed = parseChordPro(item.content);
     setParsedDocument(parsed);
+    
+    // Apply transpose from file directive if present, otherwise keep current transpose
+    if (parsed.transpose !== undefined) {
+      setTranspose(parsed.transpose);
+      if (sessionId) {
+        setStoredTranspose(sessionId, parsed.transpose);
+        // Sync transpose to clients
+        if (socketClient && sessionId) {
+          socketClient.updateContent({ transpose: parsed.transpose });
+        }
+      }
+    }
     // Use parsed title if available, otherwise use item title
     const displayTitle = parsed.title || item.title;
     setCurrentSongTitle(displayTitle);
@@ -947,6 +1014,18 @@ export default function MasterView() {
               </div>
               <div className={styles.menuDivider} />
               <div className={styles.menuItem}>
+                <span className={styles.menuLabel}>Key Change:</span>
+                <TransposeControls
+                  transpose={transpose}
+                  onIncrease={handleTransposeIncrease}
+                  onDecrease={handleTransposeDecrease}
+                  onReset={handleTransposeReset}
+                  onSetValue={handleTransposeSetValue}
+                  theme={theme}
+                />
+              </div>
+              <div className={styles.menuDivider} />
+              <div className={styles.menuItem}>
                 <ThemeToggle
                   theme={theme}
                   onToggle={() => setTheme(theme === 'light' ? 'dark' : 'light')}
@@ -1066,7 +1145,7 @@ export default function MasterView() {
         {parsedDocument ? (
           <ChordProRenderer
             key={currentSongId || 'default'}
-            document={parsedDocument}
+            document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
             onScroll={handleScroll}
             onLineScroll={handleLineScroll}
             isMaster={true}

@@ -15,6 +15,7 @@ export interface SessionInfo {
   currentSongTitle?: string;
   upNextTitle?: string;
   previousSongTitle?: string;
+  transpose?: number;
 }
 
 export class SocketClient {
@@ -209,6 +210,7 @@ export class SocketClient {
     currentSongTitle?: string;
     upNextTitle?: string;
     previousSongTitle?: string;
+    transpose?: number;
   }): void {
     if (!this.socket || !this.sessionId || !this.isMaster) {
       return;
@@ -262,6 +264,7 @@ export class SocketClient {
     currentSongTitle?: string;
     upNextTitle?: string;
     previousSongTitle?: string;
+    transpose?: number;
   }) => void): void {
     if (!this.socket) return;
 
