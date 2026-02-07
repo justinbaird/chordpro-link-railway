@@ -128,14 +128,25 @@ export default function ClientView() {
 
     // Listen for new sync-scroll event (primary method)
     client.onScrollSynced((data) => {
-      console.log('Scroll sync received:', data);
-      if (data.scrollTopPercent !== undefined) {
+      console.log('Scroll sync received on client:', data);
+      console.log('Scroll sync data details:', {
+        scrollTopPercent: data?.scrollTopPercent,
+        scrollPosition: data?.scrollPosition,
+        lineIndex: data?.lineIndex,
+        hasScrollTopPercent: data?.scrollTopPercent !== undefined,
+        hasScrollPosition: data?.scrollPosition !== undefined,
+        hasLineIndex: data?.lineIndex !== undefined,
+      });
+      if (data && data.scrollTopPercent !== undefined) {
+        console.log('Setting scrollTopPercent to:', data.scrollTopPercent);
         setScrollTopPercent(data.scrollTopPercent);
       }
-      if (data.scrollPosition !== undefined) {
+      if (data && data.scrollPosition !== undefined) {
+        console.log('Setting scrollPosition to:', data.scrollPosition);
         setScrollPosition(data.scrollPosition);
       }
-      if (data.lineIndex !== undefined) {
+      if (data && data.lineIndex !== undefined) {
+        console.log('Setting targetLineIndex to:', data.lineIndex);
         setTargetLineIndex(data.lineIndex);
       }
     });

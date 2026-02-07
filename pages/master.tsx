@@ -1265,7 +1265,7 @@ export default function MasterView() {
             <ChordProRenderer
               key={`${currentSongId || 'default'}-transpose-${transpose}`}
               document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
-              isMaster={false}
+              isMaster={true}
               theme={theme}
               textSize={textSize}
             />

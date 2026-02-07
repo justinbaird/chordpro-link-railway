@@ -142,6 +142,7 @@ app.prepare().then(() => {
     // Sync scroll - Master broadcasts scroll percentage to room
     socket.on('sync-scroll', (data) => {
       const { roomID, scrollTopPercent, scrollPosition, lineIndex } = data;
+      console.log('Server received sync-scroll:', { roomID, scrollTopPercent, scrollPosition, lineIndex, socketId: socket.id });
       const room = rooms.get(roomID);
       
       if (!room) {
@@ -151,18 +152,24 @@ app.prepare().then(() => {
 
       // Only master can sync scroll
       if (room.masterSocketId === socket.id) {
-        room.scrollTopPercent = scrollTopPercent || 0;
-        room.scrollPosition = scrollPosition || 0;
+        room.scrollTopPercent = scrollTopPercent !== undefined ? scrollTopPercent : 0;
+        room.scrollPosition = scrollPosition !== undefined ? scrollPosition : 0;
         if (lineIndex !== undefined) {
           room.lineIndex = lineIndex;
+        } else {
+          room.lineIndex = undefined;
         }
         
-        // Broadcast to all clients in the room (excluding sender)
-        socket.to(roomID).emit('scroll-synced', {
+        const broadcastData = {
           scrollTopPercent: room.scrollTopPercent,
           scrollPosition: room.scrollPosition,
           lineIndex: room.lineIndex,
-        });
+        };
+        
+        console.log('Server broadcasting scroll-synced:', broadcastData);
+        
+        // Broadcast to all clients in the room (excluding sender)
+        socket.to(roomID).emit('scroll-synced', broadcastData);
         
         console.log(`Scroll synced in room ${roomID}: ${scrollTopPercent}%`);
       } else {
