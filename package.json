@@ -1,5 +1,5 @@
 {
-  "name": "chordpro-link",
+  "name": "chordpro-link-railway",
   "version": "0.1.0",
   "description": "Real-time synchronized ChordPro chord chart viewer for chordpro.link",
   "private": true,

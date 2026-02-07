@@ -1,7 +1,7 @@
-# Production Deployment Guide for ChordPro Link
+# Production Deployment Guide for ChordPro Link Railway
 
 ## Overview
-This document outlines the production-ready configuration for deploying ChordPro Link to `chordpro.link` on Railway or similar cloud platforms.
+This document outlines the production-ready configuration for deploying ChordPro Link Railway to Railway or similar cloud platforms.
 
 ## Key Features Implemented
 
