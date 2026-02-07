@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { SocketClient } from '@/lib/socket-client';
@@ -33,6 +33,8 @@ export default function ClientView() {
   const [previousSongTitle, setPreviousSongTitle] = useState<string>('');
   const [textSize, setTextSize] = useState<number>(getStoredTextSize());
   const [transpose, setTranspose] = useState<number>(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const preservedScrollRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!sessionIdParam || typeof sessionIdParam !== 'string') {
@@ -141,6 +143,14 @@ export default function ClientView() {
 
     // Listen for content updates (including transpose)
     client.onContentUpdate((data) => {
+      // If only transpose is changing (document is same), preserve scroll position
+      const isTransposeOnlyUpdate = data.transpose !== undefined && data.document === undefined;
+      
+      if (isTransposeOnlyUpdate && contentRef.current) {
+        // Preserve current scroll position before transpose change
+        preservedScrollRef.current = contentRef.current.scrollTop;
+      }
+      
       if (data.transpose !== undefined) {
         // Transpose is per-song, so update it when content changes
         setTranspose(data.transpose);
@@ -151,6 +161,8 @@ export default function ClientView() {
         setParsedDocument(parsed);
         // Reset transpose when document changes (new song loaded)
         // The transpose will be synced via the transpose field in the update
+        // Clear preserved scroll when document actually changes
+        preservedScrollRef.current = null;
       }
       if (data.currentSongTitle !== undefined) {
         setCurrentSongTitle(data.currentSongTitle);
@@ -172,6 +184,21 @@ export default function ClientView() {
       client.disconnect();
     };
   }, [sessionIdParam]);
+
+  // Restore scroll position after transpose change causes remount
+  useEffect(() => {
+    if (preservedScrollRef.current !== null && contentRef.current) {
+      // Find the scrollable container inside ChordProRenderer
+      const scrollContainer = contentRef.current.querySelector('[class*="container"]') as HTMLElement;
+      if (scrollContainer) {
+        // Use requestAnimationFrame to ensure DOM is ready after remount
+        requestAnimationFrame(() => {
+          scrollContainer.scrollTop = preservedScrollRef.current!;
+          preservedScrollRef.current = null;
+        });
+      }
+    }
+  }, [transpose, parsedDocument]);
 
   const handleTextSizeIncrease = () => {
     const newSize = Math.min(2.0, textSize + 0.1);
@@ -286,12 +313,12 @@ export default function ClientView() {
         </div>
       </div>
 
-      <div className={styles.content}>
+      <div className={styles.content} ref={contentRef}>
         {parsedDocument ? (
           <ChordProRenderer
             key={`${currentSongTitle || 'default'}-transpose-${transpose}`}
             document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
-            scrollPosition={scrollPosition}
+            scrollPosition={preservedScrollRef.current !== null ? preservedScrollRef.current : scrollPosition}
             targetLineIndex={targetLineIndex}
             isMaster={false}
             theme={theme}

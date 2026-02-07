@@ -31,6 +31,7 @@ export default function ChordProRenderer({
   const lineRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
 
   // Scroll to top only when document changes (new file loaded)
+  // Don't scroll if scrollPosition is provided (preserving scroll during transpose)
   React.useEffect(() => {
     // Check if document actually changed
     if (previousDocumentRef.current !== document) {
@@ -39,8 +40,9 @@ export default function ChordProRenderer({
       // Clear line refs when document changes
       lineRefs.current.clear();
       
-      // Only scroll to top if this is a new document
-      if (containerRef.current) {
+      // Only scroll to top if scrollPosition is not provided or is 0
+      // This allows preserving scroll position during transpose-only updates
+      if (containerRef.current && (scrollPosition === undefined || scrollPosition === 0)) {
         containerRef.current.scrollTop = 0;
         if (onScroll && isMaster) {
           onScroll(0);
@@ -50,13 +52,16 @@ export default function ChordProRenderer({
         }
       }
     }
-  }, [document, isMaster, onScroll, onLineScroll]);
+  }, [document, isMaster, onScroll, onLineScroll, scrollPosition]);
 
   // Sync scroll position when it changes (for clients) - use percentage-based sync when available
   React.useEffect(() => {
     if (!isMaster && containerRef.current) {
-      // Only update scroll if document hasn't changed (to avoid interfering with document change scroll)
-      if (previousDocumentRef.current === document) {
+      // Restore scroll position if provided (for transpose updates that cause remount)
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        if (!containerRef.current) return;
+        
         // Use percentage-based sync if available (best for different screen sizes)
         if (scrollTopPercent !== undefined) {
           const scrollHeight = containerRef.current.scrollHeight;
@@ -78,11 +83,11 @@ export default function ChordProRenderer({
           }
         }
         
-        // Fallback to pixel-based sync
-        if (scrollPosition !== undefined) {
+        // Fallback to pixel-based sync (also used for transpose preservation)
+        if (scrollPosition !== undefined && scrollPosition > 0) {
           containerRef.current.scrollTop = scrollPosition;
         }
-      }
+      });
     }
   }, [scrollTopPercent, targetLineIndex, scrollPosition, isMaster, document]);
 
