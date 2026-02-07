@@ -78,7 +78,7 @@ export function getKeyName(semitones: number): string {
 
 /**
  * Parse key name to semitones offset from C
- * @param keyName - Key name (e.g., "C", "C#", "Db", "D")
+ * @param keyName - Key name (e.g., "C", "C#", "Db", "D", "Am", "Dm")
  * @returns Semitones offset from C, or 0 if invalid
  */
 export function parseKeyToSemitones(keyName: string): number {
@@ -88,6 +88,17 @@ export function parseKeyToSemitones(keyName: string): number {
     'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11,
   };
 
-  const normalizedKey = keyName.trim().replace(/^key:/i, '').trim();
+  let normalizedKey = keyName.trim().replace(/^key:/i, '').trim();
+  
+  // Extract root note from chord names (e.g., "Am" -> "A", "Dm7" -> "D", "C#m" -> "C#")
+  // Match note name (with optional sharp/flat) at the start
+  const rootMatch = normalizedKey.match(/^([A-G][#b]?)/i);
+  if (rootMatch) {
+    normalizedKey = rootMatch[1];
+  }
+  
+  // Normalize to uppercase for lookup
+  normalizedKey = normalizedKey.charAt(0).toUpperCase() + normalizedKey.slice(1);
+  
   return keyMap[normalizedKey] ?? 0;
 }

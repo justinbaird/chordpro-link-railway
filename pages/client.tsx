@@ -289,7 +289,7 @@ export default function ClientView() {
       <div className={styles.content}>
         {parsedDocument ? (
           <ChordProRenderer
-            key={currentSongTitle || 'default'}
+            key={`${currentSongTitle || 'default'}-transpose-${transpose}`}
             document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
             scrollPosition={scrollPosition}
             targetLineIndex={targetLineIndex}

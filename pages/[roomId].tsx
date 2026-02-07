@@ -9,6 +9,7 @@ import HamburgerMenu from '@/components/HamburgerMenu';
 import TextSizeControls from '@/components/TextSizeControls';
 import { getStoredTextSize, setStoredTextSize } from '@/lib/textSizeStorage';
 import { requestWakeLock, releaseWakeLock } from '@/lib/wakeLock';
+import { transposeDocument } from '@/lib/chordTransposer';
 import ConnectionStatus from '@/components/ConnectionStatus';
 import styles from '../styles/Client.module.css';
 
@@ -33,6 +34,7 @@ export default function RoomView() {
   const [upNextTitle, setUpNextTitle] = useState<string>('');
   const [previousSongTitle, setPreviousSongTitle] = useState<string>('');
   const [textSize, setTextSize] = useState<number>(getStoredTextSize());
+  const [transpose, setTranspose] = useState<number>(0);
   const [isMaster, setIsMaster] = useState(false);
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'syncing'>('disconnected');
@@ -107,6 +109,10 @@ export default function RoomView() {
         if (sessionInfo.previousSongTitle) {
           setPreviousSongTitle(sessionInfo.previousSongTitle);
         }
+        
+        if (sessionInfo.transpose !== undefined) {
+          setTranspose(sessionInfo.transpose);
+        }
       }).catch((err) => {
         console.error('Failed to join room:', err);
         setError(err.message || 'Failed to join room');
@@ -125,6 +131,10 @@ export default function RoomView() {
 
     // Listen for content updates (new unified event)
     client.onContentUpdate((data) => {
+      if (data.transpose !== undefined) {
+        // Update transpose when it changes
+        setTranspose(data.transpose);
+      }
       if (data.document !== undefined) {
         setDocument(data.document);
         try {
@@ -355,8 +365,8 @@ export default function RoomView() {
         <div className={styles.content}>
           {parsedDocument ? (
             <ChordProRenderer
-              key={currentSongTitle || 'default'}
-              document={parsedDocument}
+              key={`${currentSongTitle || 'default'}-transpose-${transpose}`}
+              document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
               scrollPosition={scrollPosition}
               scrollTopPercent={scrollTopPercent}
               targetLineIndex={targetLineIndex}

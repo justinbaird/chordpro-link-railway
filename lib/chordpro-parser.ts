@@ -17,6 +17,7 @@ export interface ChordProDocument {
   lines: ChordProLine[];
   metadata: Record<string, string>;
   transpose?: number; // Transpose value from {transpose: value} directive
+  key?: string; // Key from {key: X} directive (e.g., "C", "Am", "D")
 }
 
 /**
@@ -77,6 +78,11 @@ export function parseChordPro(content: string): ChordProDocument {
           if (!isNaN(transposeValue)) {
             document.transpose = transposeValue;
           }
+        }
+        
+        // Handle key directive
+        if (fullDirective === 'key') {
+          document.key = value;
         }
         
         document.metadata[fullDirective] = value;

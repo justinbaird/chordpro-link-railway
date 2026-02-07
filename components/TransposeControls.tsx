@@ -1,9 +1,10 @@
 import React from 'react';
 import styles from './TransposeControls.module.css';
-import { getKeyName } from '@/lib/chordTransposer';
+import { getKeyName, parseKeyToSemitones } from '@/lib/chordTransposer';
 
 interface TransposeControlsProps {
   transpose: number;
+  originalKey?: string; // Original key from ChordPro file (e.g., "C", "Am", "D")
   onIncrease: () => void;
   onDecrease: () => void;
   onReset: () => void;
@@ -13,13 +14,20 @@ interface TransposeControlsProps {
 
 export default function TransposeControls({
   transpose,
+  originalKey,
   onIncrease,
   onDecrease,
   onReset,
   onSetValue,
   theme = 'light',
 }: TransposeControlsProps) {
-  const currentKey = getKeyName(transpose);
+  // Calculate original key semitones (default to C if not provided)
+  const originalKeySemitones = originalKey ? parseKeyToSemitones(originalKey) : 0;
+  const originalKeyName = originalKey || 'C';
+  
+  // Current key is original key + transpose offset
+  const currentKeySemitones = originalKeySemitones + transpose;
+  const currentKey = getKeyName(currentKeySemitones);
   const isTransposed = transpose !== 0;
 
   return (
@@ -40,11 +48,11 @@ export default function TransposeControls({
             <span className={styles.keyLabel}>Key:</span>
             <span className={styles.keyValue}>{currentKey}</span>
             <span className={styles.semitones}>
-              {transpose > 0 ? '+' : ''}{transpose}
+              ({originalKeyName} {transpose > 0 ? '+' : ''}{transpose})
             </span>
           </>
         ) : (
-          <span className={styles.originalKey}>Original Key</span>
+          <span className={styles.originalKey}>Original: {originalKeyName}</span>
         )}
       </div>
 
@@ -77,10 +85,11 @@ export default function TransposeControls({
           aria-label="Select key"
         >
           {Array.from({ length: 12 }, (_, i) => i - 11).map((semitones) => {
-            const keyName = getKeyName(semitones);
+            const keySemitones = originalKeySemitones + semitones;
+            const keyName = getKeyName(keySemitones);
             return (
               <option key={semitones} value={semitones}>
-                {keyName} {semitones > 0 ? `(+${semitones})` : semitones < 0 ? `(${semitones})` : '(Original)'}
+                {keyName} {semitones > 0 ? `(+${semitones})` : semitones < 0 ? `(${semitones})` : `(${originalKeyName})`}
               </option>
             );
           })}

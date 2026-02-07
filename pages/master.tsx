@@ -498,6 +498,7 @@ export default function MasterView() {
         socketClient.updateContent({
           upNextTitle: nextItem ? nextItem.title : '',
           previousSongTitle: previousItem ? previousItem.title : '',
+          transpose: transpose, // Include current transpose to keep clients in sync
         });
       }
   };
@@ -542,6 +543,7 @@ export default function MasterView() {
         socketClient.updateContent({
           upNextTitle: nextItem ? nextItem.title : '',
           previousSongTitle: previousItem ? previousItem.title : '',
+          transpose: transpose, // Include current transpose to keep clients in sync
         });
       }
       return newSetlist;
@@ -1139,6 +1141,7 @@ export default function MasterView() {
               <div className={styles.transposeSection}>
                 <TransposeControls
                   transpose={transpose}
+                  originalKey={parsedDocument?.key}
                   onIncrease={handleTransposeIncrease}
                   onDecrease={handleTransposeDecrease}
                   onReset={handleTransposeReset}
@@ -1148,7 +1151,7 @@ export default function MasterView() {
               </div>
             )}
             <ChordProRenderer
-              key={currentSongId || 'default'}
+              key={`${currentSongId || 'default'}-transpose-${transpose}`}
               document={transpose !== 0 ? transposeDocument(parsedDocument, transpose) : parsedDocument}
               onScroll={handleScroll}
               onLineScroll={handleLineScroll}
