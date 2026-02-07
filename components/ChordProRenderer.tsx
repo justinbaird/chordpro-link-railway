@@ -29,6 +29,7 @@ export default function ChordProRenderer({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const previousDocumentRef = React.useRef<ChordProDocument | null>(null);
   const lineRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
+  const isProgrammaticScrollRef = React.useRef<boolean>(false);
 
   // Scroll to top only when document content actually changes (not just transpose)
   // Compare by checking if the number of lines changed or if it's a completely different document
@@ -63,58 +64,121 @@ export default function ChordProRenderer({
   // Sync scroll position when it changes (for clients) - use percentage-based sync when available
   React.useEffect(() => {
     if (!isMaster && containerRef.current) {
-      console.log('Scroll sync effect triggered:', { scrollTopPercent, scrollPosition, targetLineIndex });
+      console.log('Scroll sync effect triggered:', { scrollTopPercent, scrollPosition, targetLineIndex, isMaster });
+      console.log('Container element:', containerRef.current);
+      console.log('Container dimensions:', {
+        scrollHeight: containerRef.current.scrollHeight,
+        clientHeight: containerRef.current.clientHeight,
+        scrollTop: containerRef.current.scrollTop,
+        offsetHeight: containerRef.current.offsetHeight,
+      });
+      
       // Use requestAnimationFrame to ensure DOM is ready
       const applyScroll = () => {
         if (!containerRef.current) {
-          console.log('Container ref not available');
+          console.log('Container ref not available in applyScroll');
           return;
         }
         
+        const container = containerRef.current;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+        const maxScroll = scrollHeight - clientHeight;
+        
+        console.log('applyScroll called:', { scrollHeight, clientHeight, maxScroll, currentScrollTop: container.scrollTop });
+        
         // Use percentage-based sync if available (best for different screen sizes)
-        if (scrollTopPercent !== undefined) {
-          const scrollHeight = containerRef.current.scrollHeight;
-          const clientHeight = containerRef.current.clientHeight;
-          const maxScroll = scrollHeight - clientHeight;
+        if (scrollTopPercent !== undefined && scrollTopPercent !== null) {
           if (maxScroll > 0) {
             const targetScroll = (scrollTopPercent / 100) * maxScroll;
-            console.log('Applying scroll via percentage:', { scrollTopPercent, targetScroll, scrollHeight, clientHeight, maxScroll });
-            containerRef.current.scrollTop = targetScroll;
+            console.log('Applying scroll via percentage:', { 
+              scrollTopPercent, 
+              targetScroll, 
+              scrollHeight, 
+              clientHeight, 
+              maxScroll,
+              beforeScrollTop: container.scrollTop 
+            });
+            isProgrammaticScrollRef.current = true;
+            container.scrollTop = targetScroll;
+            console.log('After setting scrollTop:', { newScrollTop: container.scrollTop, targetScroll });
+            // Reset flag after a short delay
+            setTimeout(() => {
+              isProgrammaticScrollRef.current = false;
+            }, 100);
+            // Verify it was set correctly
+            setTimeout(() => {
+              console.log('ScrollTop after 10ms:', container.scrollTop);
+            }, 10);
             return;
+          } else {
+            console.log('Cannot apply percentage scroll - maxScroll <= 0:', { scrollHeight, clientHeight, maxScroll });
           }
         }
         
         // Use line-based sync if available (better for different text sizes)
-        if (targetLineIndex !== undefined && lineRefs.current.has(targetLineIndex)) {
-          const targetLineElement = lineRefs.current.get(targetLineIndex);
-          if (targetLineElement) {
-            console.log('Applying scroll via line index:', { targetLineIndex, offsetTop: targetLineElement.offsetTop });
-            // Scroll the target line to the top
-            containerRef.current.scrollTop = targetLineElement.offsetTop;
-            return;
+        if (targetLineIndex !== undefined && targetLineIndex !== null) {
+          console.log('Checking line-based sync:', { targetLineIndex, hasLineRef: lineRefs.current.has(targetLineIndex), lineRefsSize: lineRefs.current.size });
+          if (lineRefs.current.has(targetLineIndex)) {
+            const targetLineElement = lineRefs.current.get(targetLineIndex);
+            if (targetLineElement) {
+              console.log('Applying scroll via line index:', { targetLineIndex, offsetTop: targetLineElement.offsetTop, beforeScrollTop: container.scrollTop });
+              // Scroll the target line to the top
+              isProgrammaticScrollRef.current = true;
+              container.scrollTop = targetLineElement.offsetTop;
+              console.log('After setting scrollTop via line:', { newScrollTop: container.scrollTop });
+              setTimeout(() => {
+                isProgrammaticScrollRef.current = false;
+              }, 100);
+              return;
+            } else {
+              console.log('Line element is null for index:', targetLineIndex);
+            }
+          } else {
+            console.log('Line ref not found for index:', targetLineIndex, 'Available indices:', Array.from(lineRefs.current.keys()));
           }
         }
         
         // Fallback to pixel-based sync (also used for transpose preservation)
-        if (scrollPosition !== undefined && scrollPosition > 0) {
-          console.log('Applying scroll via position:', scrollPosition);
-          containerRef.current.scrollTop = scrollPosition;
+        if (scrollPosition !== undefined && scrollPosition !== null && scrollPosition > 0) {
+          console.log('Applying scroll via position:', { scrollPosition, beforeScrollTop: container.scrollTop });
+          isProgrammaticScrollRef.current = true;
+          container.scrollTop = scrollPosition;
+          console.log('After setting scrollTop via position:', { newScrollTop: container.scrollTop });
+          setTimeout(() => {
+            isProgrammaticScrollRef.current = false;
+          }, 100);
+        } else {
+          console.log('Skipping pixel-based scroll:', { scrollPosition });
         }
       };
       
       // Try immediately, then retry after a short delay to ensure DOM is ready
       requestAnimationFrame(() => {
+        console.log('requestAnimationFrame callback - first attempt');
         applyScroll();
         // Retry after a short delay in case content is still rendering
-        setTimeout(applyScroll, 50);
+        setTimeout(() => {
+          console.log('setTimeout 50ms - second attempt');
+          applyScroll();
+        }, 50);
         // Also retry after longer delay for slow renders
-        setTimeout(applyScroll, 200);
+        setTimeout(() => {
+          console.log('setTimeout 200ms - third attempt');
+          applyScroll();
+        }, 200);
       });
+    } else {
+      console.log('Scroll sync effect skipped:', { isMaster, hasContainerRef: !!containerRef.current });
     }
   }, [scrollTopPercent, targetLineIndex, scrollPosition, isMaster, document]);
 
   // Track scroll for master
   const handleScroll = React.useCallback(() => {
+    // Skip if this is a programmatic scroll (to avoid interference)
+    if (isProgrammaticScrollRef.current) {
+      return;
+    }
     if (isMaster && containerRef.current) {
       const scrollTop = containerRef.current.scrollTop;
       const scrollHeight = containerRef.current.scrollHeight;
