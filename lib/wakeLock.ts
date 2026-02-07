@@ -16,9 +16,11 @@ export async function requestWakeLock(): Promise<boolean> {
     console.log('Wake Lock activated');
     
     // Handle wake lock release (e.g., when tab becomes hidden)
-    wakeLock.addEventListener('release', () => {
-      console.log('Wake Lock released');
-    });
+    if (wakeLock) {
+      wakeLock.addEventListener('release', () => {
+        console.log('Wake Lock released');
+      });
+    }
     
     return true;
   } catch (error) {
