@@ -304,6 +304,7 @@ export default function ChordProRenderer({
     <div
       ref={containerRef}
       className={`${styles.container} ${theme === 'dark' ? styles.dark : ''}`}
+      data-master={isMaster ? 'true' : 'false'}
       onScroll={isMaster ? undefined : handleScroll}
       style={textSizeStyle}
     >

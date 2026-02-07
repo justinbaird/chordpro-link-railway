@@ -13,6 +13,13 @@
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* On master view, let parent handle scrolling - container should not be scrollable */
+.container[data-master="true"] {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: auto !important;
+}
+
 /* Mobile optimization: prevent horizontal scroll */
 @media (max-width: 768px) {
   .container {

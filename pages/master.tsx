@@ -623,18 +623,23 @@ export default function MasterView() {
   };
 
   const handleScroll = (position: number, scrollTopPercent?: number, lineIndex?: number) => {
+    console.log('handleScroll called:', { position, scrollTopPercent, lineIndex, hasSocketClient: !!socketClient, sessionId });
     setScrollPosition(position);
     if (socketClient && sessionId) {
       // Use new sync-scroll event with scrollTopPercent
       if (scrollTopPercent !== undefined) {
+        console.log('Sending syncScroll:', { sessionId, scrollTopPercent, position, lineIndex });
         socketClient.syncScroll(sessionId, scrollTopPercent, position, lineIndex);
       } else {
         // Fallback to legacy method
+        console.log('Using legacy scroll update:', position);
         socketClient.updateScroll(position);
         if (lineIndex !== undefined) {
           socketClient.updateLineScroll(lineIndex);
         }
       }
+    } else {
+      console.log('Cannot sync scroll - missing socketClient or sessionId');
     }
   };
 
@@ -1216,11 +1221,14 @@ export default function MasterView() {
             const maxScroll = scrollHeight - clientHeight;
             const scrollTopPercent = maxScroll > 0 ? (scrollTop / maxScroll) * 100 : 0;
             
+            console.log('Master scroll event:', { scrollTop, scrollHeight, clientHeight, maxScroll, scrollTopPercent });
+            
             // Calculate line index for better sync
             let lineIndex: number | undefined = undefined;
             if (parsedDocument) {
               // Find the line closest to scroll position
               const allLines = target.querySelectorAll('[data-line-index]');
+              console.log('Found lines:', allLines.length);
               let minDistance = Infinity;
               allLines.forEach((lineEl) => {
                 const element = lineEl as HTMLElement;
@@ -1232,6 +1240,7 @@ export default function MasterView() {
                   lineIndex = lineIdx;
                 }
               });
+              console.log('Calculated line index:', lineIndex);
             }
             
             handleScroll(scrollTop, scrollTopPercent, lineIndex);
