@@ -2,6 +2,8 @@
 
 A web application for rendering ChordPro format text files with synchronized viewing across multiple devices. Perfect for bands who want to share chord charts and lyrics in real-time.
 
+**Note:** This is a localhost/development version. The application runs on `localhost:3000` and requires all users to be on the same local network to connect to the master session.
+
 ## Features
 
 - **Master View**: Control the session, scroll position, and song selection

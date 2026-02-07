@@ -1,6 +1,7 @@
 {
   "name": "chordpro-link",
   "version": "0.1.0",
+  "description": "Real-time synchronized ChordPro chord chart viewer - localhost/development version",
   "private": true,
   "scripts": {
     "dev": "node server.js",
