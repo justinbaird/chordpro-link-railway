@@ -30,6 +30,8 @@ export default function ChordProRenderer({
   const previousDocumentRef = React.useRef<ChordProDocument | null>(null);
   const lineRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
   const isProgrammaticScrollRef = React.useRef<boolean>(false);
+  const scrollTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const lastScrollValuesRef = React.useRef<{ scrollTopPercent?: number; targetLineIndex?: number; scrollPosition?: number } | null>(null);
 
   // Scroll to top only when document content actually changes (not just transpose)
   // Compare by checking if the number of lines changed or if it's a completely different document
@@ -64,6 +66,27 @@ export default function ChordProRenderer({
   // Sync scroll position when it changes (for clients) - use percentage-based sync when available
   React.useEffect(() => {
     if (!isMaster && containerRef.current) {
+      // Debounce scroll updates to prevent jerky scrolling
+      const currentValues = { scrollTopPercent, targetLineIndex, scrollPosition };
+      const lastValues = lastScrollValuesRef.current;
+      
+      // Skip if values haven't changed significantly
+      if (lastValues) {
+        const percentDiff = scrollTopPercent !== undefined && lastValues.scrollTopPercent !== undefined
+          ? Math.abs(scrollTopPercent - lastValues.scrollTopPercent)
+          : 0;
+        const lineDiff = targetLineIndex !== undefined && lastValues.targetLineIndex !== undefined
+          ? Math.abs(targetLineIndex - lastValues.targetLineIndex)
+          : 0;
+        
+        // Skip if change is very small (less than 0.5% or 1 line)
+        if (percentDiff < 0.5 && lineDiff <= 1 && scrollPosition === lastValues.scrollPosition) {
+          return;
+        }
+      }
+      
+      lastScrollValuesRef.current = currentValues;
+      
       console.log('Scroll sync effect triggered:', { scrollTopPercent, scrollPosition, targetLineIndex, isMaster });
       console.log('Container element:', containerRef.current);
       console.log('Container data-master attribute:', containerRef.current?.getAttribute('data-master'));
@@ -198,21 +221,25 @@ export default function ChordProRenderer({
         }
       };
       
-      // Try immediately, then retry after a short delay to ensure DOM is ready
-      requestAnimationFrame(() => {
-        console.log('requestAnimationFrame callback - first attempt');
-        applyScroll();
-        // Retry after a short delay in case content is still rendering
-        setTimeout(() => {
-          console.log('setTimeout 50ms - second attempt');
+      // Clear any pending scroll timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      
+      // Debounce scroll application to prevent jerky updates
+      scrollTimeoutRef.current = setTimeout(() => {
+        requestAnimationFrame(() => {
+          console.log('requestAnimationFrame callback - applying scroll');
           applyScroll();
-        }, 50);
-        // Also retry after longer delay for slow renders
-        setTimeout(() => {
-          console.log('setTimeout 200ms - third attempt');
-          applyScroll();
-        }, 200);
-      });
+        });
+      }, 16); // ~60fps, smooth scrolling
+      
+      // Cleanup timeout on unmount
+      return () => {
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+      };
     } else {
       console.log('Scroll sync effect skipped:', { isMaster, hasContainerRef: !!containerRef.current });
     }
